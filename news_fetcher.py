@@ -318,107 +318,63 @@ def format_buy_alert(company: str, data: dict, mood: str) -> str:
 # ─────────────────────────────────────────────
 # MAIN PIPELINE
 # ─────────────────────────────────────────────
-def main() -> None:
-    start = time.time()
-    log.info("=" * 60)
-    log.info("  AI PRE-MARKET STOCK INTELLIGENCE SYSTEM — STARTING")
-    log.info("=" * 60)
-
-    # ── Load models ──────────────────────────
-    engine = SentimentEngine()
-    nlp    = load_nlp()
-
-    # ── Fetch news ───────────────────────────
-    headlines = fetch_headlines()
-    if not headlines:
-        log.warning("No headlines fetched. Exiting.")
-        send_telegram("⚠ No headlines fetched today. System could not run analysis.")
-        return
-
-    # ── Analyse each headline ─────────────────
-    all_results:    list[dict]                    = []
-    company_data:   dict[str, list[dict]]         = defaultdict(list)
-    alerted_set:    set[str]                      = set()   # F. duplicate protection
-
-    for headline in headlines:
-        result = engine.analyse(headline)
-        result["headline"] = headline
-        all_results.append(result)
-
-        company = extract_company(headline, nlp)
-        if company:
-            company_data[company].append(result)
-
-        log.info(
-            f"  [{result['sentiment'].upper():8s}] conf={result['confidence']:.2f} | {headline[:80]}"
-        )
-
-    # ── Market context ────────────────────────
-    mood = market_mood(all_results)
-    log.info(f"\n🌐 Market Mood: {mood}")
-
-    # ── Aggregate & decide ────────────────────
-    aggregated = aggregate_signals(dict(company_data))
-
     log.info("\n── COMPANY SIGNAL SUMMARY ──")
     buy_alerts: list[str] = []
 
     for company, data in aggregated.items():
         action = data["final_action"]
 
-        # E. Bearish market → suppress BUY
+        # Bearish market → suppress BUY
         if mood == "Bearish" and action == "BUY":
             action = "HOLD"
             log.info(f"  {company:30s} | conf={data['avg_confidence']:.2f} | BUY → HOLD (bearish market)")
         else:
             log.info(f"  {company:30s} | conf={data['avg_confidence']:.2f} | {action}")
 
-        # F. Duplicate guard + send alert
+        # Send only BUY alerts
         if action == "BUY" and company not in alerted_set:
             alerted_set.add(company)
             buy_alerts.append(format_buy_alert(company, data, mood))
 
-    # ── Send Telegram ─────────────────────────
-if buy_alerts:
-    for alert in buy_alerts:
-        send_telegram(alert)
-else:
-    send_telegram(
-        "🔕 <b>No strong BUY signals today.</b>\n"
-        f"Market sentiment: <b>{mood}</b>. Staying cautious."
-    )
+    # ── SEND TELEGRAM ─────────────────────────
+    if buy_alerts:
+        for alert in buy_alerts:
+            send_telegram(alert)
+    else:
+        send_telegram(
+            "🔕 <b>No strong BUY signals today.</b>\n"
+            f"Market sentiment: <b>{mood}</b>. Staying cautious."
+        )
 
-# ─────────────────────────────────────────
-# 🔥 NEW: SAVE DATA FOR DASHBOARD
-# ─────────────────────────────────────────
-import json
+    # ── SAVE DASHBOARD DATA (VERY IMPORTANT) ──
+    import json
 
-dashboard_data = {
-    "date": time.strftime("%d %b %Y"),
-    "market_mood": mood,
-    "buy_signals": len(buy_alerts),
-    "avg_confidence": round(
-        sum(d["avg_confidence"] for d in aggregated.values()) / len(aggregated)
-        if aggregated else 0, 2
-    ),
-    "signals": []
-}
+    dashboard_data = {
+        "date": time.strftime("%d %b %Y"),
+        "market_mood": mood,
+        "buy_signals": len(buy_alerts),
+        "avg_confidence": round(
+            sum(d["avg_confidence"] for d in aggregated.values()) / len(aggregated)
+            if aggregated else 0, 2
+        ),
+        "signals": []
+    }
 
-for company, data in aggregated.items():
-    dashboard_data["signals"].append({
-        "name": company,
-        "sector": "N/A",
-        "confidence": int(data["avg_confidence"] * 100),
-        "action": data["final_action"].lower(),
-        "reason": data["top_headline"]
-    })
+    for company, data in aggregated.items():
+        dashboard_data["signals"].append({
+            "name": company,
+            "sector": "N/A",
+            "confidence": int(data["avg_confidence"] * 100),
+            "action": data["final_action"].lower(),
+            "reason": data["top_headline"]
+        })
 
-with open("data.json", "w") as f:
-    json.dump(dashboard_data, f, indent=4)
+    with open("data.json", "w") as f:
+        json.dump(dashboard_data, f, indent=4)
 
-log.info("📊 data.json updated for dashboard")
+    log.info("📊 data.json updated")
 
-# ── END ───────────────────────────────────
-elapsed = round(time.time() - start, 2)
-log.info(f"\n✅ Pipeline complete in {elapsed}s. Alerts sent: {len(buy_alerts)}")
-log.info("=" * 60)
+    # ── END ───────────────────────────────────
+    elapsed = round(time.time() - start, 2)
+    log.info(f"\n✅ Pipeline complete in {elapsed}s. Alerts sent: {len(buy_alerts)}")
+    log.info("=" * 60)

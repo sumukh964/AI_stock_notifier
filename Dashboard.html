@@ -746,34 +746,17 @@ select:hover { border-color: var(--green); }
 
 <script>
 /* ── DATA ─────────────────────────────────────────────────────────────────── */
-const SIGNALS = [
-  {name:'Reliance Industries',sector:'Energy',conf:89,action:'buy',headlines:3,pos:3,reason:'Reliance posts record Q4 profit on Jio growth'},
-  {name:'HDFC Bank',sector:'Banking',conf:83,action:'buy',headlines:2,pos:2,reason:'HDFC Bank sees surge in retail loan disbursals in March'},
-  {name:'Infosys',sector:'IT',conf:81,action:'buy',headlines:2,pos:2,reason:'Infosys wins $500M multi-year deal from European bank'},
-  {name:'Bajaj Finance',sector:'NBFC',conf:80,action:'buy',headlines:1,pos:1,reason:'Bajaj Finance Q4 net profit rises 21% YoY to Rs 4,200 Cr'},
-  {name:'Tata Motors',sector:'Auto',conf:72,action:'hold',headlines:2,pos:1,reason:'Tata Motors EV sales hit record 18,000 units in March 2026'},
-  {name:'SBI',sector:'Banking',conf:64,action:'hold',headlines:1,pos:0,reason:'SBI raises red flag over rising NPAs in MSME segment'},
-  {name:'Wipro',sector:'IT',conf:58,action:'sell',headlines:1,pos:0,reason:'Wipro flags weak demand; management guidance disappoints'},
-  {name:'Sun Pharma',sector:'Pharma',conf:38,action:'sell',headlines:1,pos:0,reason:'Sun Pharma receives FDA warning letter for Halol plant'},
-];
 
-const HEADLINES = [
-  {text:'Reliance Industries posts record Q4 profit on Jio growth and retail expansion',source:'et',sent:'positive',conf:91},
-  {text:'HDFC Bank sees surge in retail loan disbursals in March quarter; NIM stable',source:'et',sent:'positive',conf:85},
-  {text:'Infosys wins $500M multi-year outsourcing deal from leading European bank',source:'mc',sent:'positive',conf:83},
-  {text:'Bajaj Finance Q4 net profit rises 21% year-on-year to Rs 4,200 crore',source:'lm',sent:'positive',conf:80},
-  {text:'NTPC commissions 500MW solar project ahead of schedule in Rajasthan',source:'et',sent:'positive',conf:74},
-  {text:'Tata Motors EV sales hit record 18,000 units in March 2026 on Nexon demand',source:'mc',sent:'positive',conf:72},
-  {text:'RBI holds rates steady amid global uncertainty; maintains accommodative stance',source:'et',sent:'neutral',conf:67},
-  {text:'Market opens flat as investors await global cues ahead of Fed meeting',source:'lm',sent:'neutral',conf:61},
-  {text:'Sebi tightens F&O margin norms; traders brace for higher capital requirements',source:'mc',sent:'neutral',conf:58},
-  {text:'Budget deficit narrows slightly in Q4 on higher GST collections',source:'et',sent:'neutral',conf:55},
-  {text:'Wipro flags weak demand outlook; management guidance disappoints Street',source:'mc',sent:'negative',conf:76},
-  {text:'Sun Pharma receives US FDA warning letter for Halol manufacturing unit',source:'lm',sent:'negative',conf:82},
-  {text:'SBI raises red flag over rising NPAs in MSME segment post moratorium end',source:'et',sent:'negative',conf:69},
-  {text:'Maruti Suzuki reports 8% decline in wholesale dispatches for April 2026',source:'mc',sent:'negative',conf:71},
-];
+let SIGNALS = [];
 
+fetch('data.json')
+  .then(res => res.json())
+  .then(data => {
+    SIGNALS = data.signals;
+
+    renderSignals();
+    initSignalChart();
+  });
 /* ── NAV ──────────────────────────────────────────────────────────────────── */
 const rendered = {};
 function showPage(id, el) {

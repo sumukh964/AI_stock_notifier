@@ -379,19 +379,46 @@ def main() -> None:
             buy_alerts.append(format_buy_alert(company, data, mood))
 
     # ── Send Telegram ─────────────────────────
-    if buy_alerts:
-        for alert in buy_alerts:
-            send_telegram(alert)
-    else:
-        send_telegram(
-            "🔕 <b>No strong BUY signals today.</b>\n"
-            f"Market sentiment: <b>{mood}</b>. Staying cautious."
-        )
+if buy_alerts:
+    for alert in buy_alerts:
+        send_telegram(alert)
+else:
+    send_telegram(
+        "🔕 <b>No strong BUY signals today.</b>\n"
+        f"Market sentiment: <b>{mood}</b>. Staying cautious."
+    )
 
-    elapsed = round(time.time() - start, 2)
-    log.info(f"\n✅ Pipeline complete in {elapsed}s. Alerts sent: {len(buy_alerts)}")
-    log.info("=" * 60)
+# ─────────────────────────────────────────
+# 🔥 NEW: SAVE DATA FOR DASHBOARD
+# ─────────────────────────────────────────
+import json
 
+dashboard_data = {
+    "date": time.strftime("%d %b %Y"),
+    "market_mood": mood,
+    "buy_signals": len(buy_alerts),
+    "avg_confidence": round(
+        sum(d["avg_confidence"] for d in aggregated.values()) / len(aggregated)
+        if aggregated else 0, 2
+    ),
+    "signals": []
+}
 
-if __name__ == "__main__":
-    main()
+for company, data in aggregated.items():
+    dashboard_data["signals"].append({
+        "name": company,
+        "sector": "N/A",
+        "confidence": int(data["avg_confidence"] * 100),
+        "action": data["final_action"].lower(),
+        "reason": data["top_headline"]
+    })
+
+with open("data.json", "w") as f:
+    json.dump(dashboard_data, f, indent=4)
+
+log.info("📊 data.json updated for dashboard")
+
+# ── END ───────────────────────────────────
+elapsed = round(time.time() - start, 2)
+log.info(f"\n✅ Pipeline complete in {elapsed}s. Alerts sent: {len(buy_alerts)}")
+log.info("=" * 60)

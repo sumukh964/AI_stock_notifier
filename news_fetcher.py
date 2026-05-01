@@ -1,18 +1,28 @@
+"""
+AI Pre-Market Stock Intelligence System — v2
+=============================================
+Author  : ML Engineer Portfolio Project
+Changes : NewsAPI → dynamic company extraction → Rise/Fall prediction
+          No fixed whitelist — analyses ANY company found in the news.
+"""
+
 import os
+import re
+import json
 import time
 import logging
 import requests
-from bs4 import BeautifulSoup
 from collections import defaultdict
+from datetime import datetime, timedelta
+from pathlib import Path
 
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch.nn.functional as F
-
 import spacy
 
 # ─────────────────────────────────────────────
-# LOGGING SETUP
+# LOGGING
 # ─────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
@@ -23,187 +33,150 @@ log = logging.getLogger(__name__)
 
 
 # ─────────────────────────────────────────────
-# CONSTANTS & CONFIG
+# CONFIG
 # ─────────────────────────────────────────────
-MAX_HEADLINES = 30
-BUY_CONFIDENCE_THRESHOLD   = 0.80   # multi-news aggregated avg
-SINGLE_BUY_THRESHOLD       = 0.85   # single-headline BUY
-HOLD_LOWER_THRESHOLD       = 0.65   # single-headline HOLD
-BEARISH_MARKET_RATIO       = 0.50   # >50 % negative → bearish
+NEWS_API_KEY   = os.getenv("NEWS_API_KEY")       # from GitHub Secret
+BOT_TOKEN      = os.getenv("BOT_TOKEN")
+CHAT_ID        = os.getenv("CHAT_ID")
+ALERTS_LOG     = Path("docs/alerts.json")
 
-NSE_WHITELIST = {
-    "reliance", "tcs", "tata consultancy", "infosys", "hdfc bank",
-    "icici bank", "sbi", "state bank", "axis bank", "l&t",
-    "larsen", "toubro", "itc", "bharti airtel", "airtel",
-    "hul", "hindustan unilever", "wipro", "tata motors",
-    "maruti", "sun pharma", "ntpc", "power grid",
-    "adani enterprises", "adani ports", "bajaj finance",
-}
+MAX_ARTICLES            = 50    # fetch up to 50 articles from NewsAPI
+MIN_HEADLINES_FOR_SIGNAL = 2    # need at least 2 headlines per company to signal
+BUY_CONFIDENCE_THRESHOLD = 0.75 # aggregated avg confidence for RISE signal
+SELL_CONFIDENCE_THRESHOLD= 0.75 # aggregated avg confidence for FALL signal
+BEARISH_MARKET_RATIO     = 0.50 # >50% negative headlines → suppress RISE signals
 
-# Canonical display names mapped from possible NLP extractions
-COMPANY_CANONICAL = {
-    "tata consultancy": "TCS",
-    "tcs": "TCS",
-    "reliance": "Reliance Industries",
-    "infosys": "Infosys",
-    "hdfc bank": "HDFC Bank",
-    "icici bank": "ICICI Bank",
-    "state bank": "SBI",
-    "sbi": "SBI",
-    "axis bank": "Axis Bank",
-    "larsen": "L&T",
-    "toubro": "L&T",
-    "l&t": "L&T",
-    "itc": "ITC",
-    "bharti airtel": "Bharti Airtel",
-    "airtel": "Bharti Airtel",
-    "hindustan unilever": "HUL",
-    "hul": "HUL",
-    "wipro": "Wipro",
-    "tata motors": "Tata Motors",
-    "maruti": "Maruti Suzuki",
-    "sun pharma": "Sun Pharma",
-    "ntpc": "NTPC",
-    "power grid": "Power Grid",
-    "adani enterprises": "Adani Enterprises",
-    "adani ports": "Adani Ports",
-    "bajaj finance": "Bajaj Finance",
-}
-
-NOISE_ENTITIES = {
+# Generic noise words to ignore as company names
+NOISE_WORDS = {
     "india", "rbi", "government", "market", "economy", "ministry",
     "sebi", "nse", "bse", "sensex", "nifty", "rupee", "gdp",
     "fed", "us", "china", "europe", "budget", "parliament",
+    "court", "supreme", "finance", "banking", "sector", "investors",
+    "traders", "analyst", "analysts", "sources", "report", "reuters",
+    "bloomberg", "press", "trust", "india", "bharat", "ltd", "limited",
+    "corp", "corporation", "group", "holdings", "ventures", "capital",
+    "markets", "exchange", "board", "authority", "committee", "fund",
 }
-
-NEWS_SOURCES = [
-    {
-        "name": "Economic Times Markets",
-        "url": "https://economictimes.indiatimes.com/markets/stocks/news",
-        "tag": "a",
-        "class_": "eachStory",
-        "headline_tag": "h3",
-    },
-    {
-        "name": "Moneycontrol Markets",
-        "url": "https://www.moneycontrol.com/news/business/markets/",
-        "tag": "li",
-        "class_": "clearfix",
-        "headline_tag": "h2",
-    },
-    {
-        "name": "LiveMint Markets",
-        "url": "https://www.livemint.com/market/stock-market-news",
-        "tag": "div",
-        "class_": "listingNew",
-        "headline_tag": "h2",
-    },
-]
 
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/124.0.0.0 Safari/537.36"
+        "AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36"
     )
 }
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-CHAT_ID   = os.getenv("CHAT_ID")
-
 
 # ─────────────────────────────────────────────
-# A. NEWS COLLECTION
+# A. NEWS COLLECTION — NewsAPI
 # ─────────────────────────────────────────────
-def fetch_headlines() -> list[str]:
-    """Scrape headlines from multiple Indian financial news sources."""
-    all_headlines: list[str] = []
+def fetch_news() -> list[dict]:
+    """
+    Fetch Indian business/stock news from NewsAPI.
+    Returns list of {title, description, url, source, published_at}
+    """
+    if not NEWS_API_KEY:
+        log.error("NEWS_API_KEY not set. Cannot fetch news.")
+        return []
 
-    for source in NEWS_SOURCES:
+    # Date range: last 24 hours
+    from_date = (datetime.utcnow() - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    queries = [
+        "India stock market NSE BSE shares",
+        "India company earnings profit quarterly results",
+        "India business acquisition merger deal",
+    ]
+
+    all_articles: list[dict] = []
+    seen_titles:  set[str]   = set()
+
+    for q in queries:
         try:
-            response = requests.get(source["url"], headers=HEADERS, timeout=10)
-            response.raise_for_status()
-            soup = BeautifulSoup(response.text, "html.parser")
+            resp = requests.get(
+                "https://newsapi.org/v2/everything",
+                params={
+                    "q":          q,
+                    "from":       from_date,
+                    "language":   "en",
+                    "sortBy":     "relevancy",
+                    "pageSize":   20,
+                    "apiKey":     NEWS_API_KEY,
+                },
+                timeout=10,
+            )
+            resp.raise_for_status()
+            data = resp.json()
 
-            containers = soup.find_all(source["tag"], class_=source["class_"])
-            for container in containers:
-                tag = container.find(source["headline_tag"])
-                if tag and tag.get_text(strip=True):
-                    all_headlines.append(tag.get_text(strip=True))
+            for article in data.get("articles", []):
+                title = (article.get("title") or "").strip()
+                desc  = (article.get("description") or "").strip()
 
-            log.info(f"✅ Fetched from {source['name']}")
+                if not title or title in seen_titles:
+                    continue
+                if "[Removed]" in title:
+                    continue
 
-        except requests.exceptions.Timeout:
-            log.warning(f"⏱ Timeout fetching {source['name']}")
+                seen_titles.add(title)
+                all_articles.append({
+                    "title":        title,
+                    "description":  desc,
+                    "url":          article.get("url", ""),
+                    "source":       article.get("source", {}).get("name", "Unknown"),
+                    "published_at": article.get("publishedAt", ""),
+                    "full_text":    f"{title}. {desc}".strip(),
+                })
+
+            log.info(f"✅ NewsAPI query '{q[:40]}' → {len(data.get('articles',[]))} articles")
+
         except requests.exceptions.RequestException as exc:
-            log.warning(f"⚠ Error fetching {source['name']}: {exc}")
+            log.warning(f"⚠ NewsAPI error for query '{q}': {exc}")
 
-    # Deduplicate while preserving order
-    seen: set[str] = set()
-    unique: list[str] = []
-    for h in all_headlines:
-        if h not in seen:
-            seen.add(h)
-            unique.append(h)
-
-    headlines = unique[:MAX_HEADLINES]
-    log.info(f"📰 Total unique headlines collected: {len(headlines)}")
-    return headlines
+    articles = all_articles[:MAX_ARTICLES]
+    log.info(f"📰 Total unique articles: {len(articles)}")
+    return articles
 
 
 # ─────────────────────────────────────────────
 # B. FINBERT SENTIMENT ENGINE
 # ─────────────────────────────────────────────
 class SentimentEngine:
-    """Loads FinBERT once and exposes per-headline inference."""
-
     MODEL_NAME = "ProsusAI/finbert"
 
     def __init__(self):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         log.info(f"🔧 Loading FinBERT on {self.device} …")
         self.tokenizer = AutoTokenizer.from_pretrained(self.MODEL_NAME)
-        self.model = AutoModelForSequenceClassification.from_pretrained(self.MODEL_NAME)
+        self.model     = AutoModelForSequenceClassification.from_pretrained(self.MODEL_NAME)
         self.model.to(self.device)
         self.model.eval()
-        self.labels = ["positive", "negative", "neutral"]   # FinBERT label order
+        self.labels = ["positive", "negative", "neutral"]
         log.info("✅ FinBERT loaded.")
 
     @torch.no_grad()
-    def analyse(self, headline: str) -> dict:
-        """Return sentiment label, confidence, and raw action."""
+    def analyse(self, text: str) -> dict:
         inputs = self.tokenizer(
-            headline,
-            return_tensors="pt",
-            truncation=True,
-            max_length=512,
-            padding=True,
+            text, return_tensors="pt",
+            truncation=True, max_length=512, padding=True,
         ).to(self.device)
 
         logits = self.model(**inputs).logits
         probs  = F.softmax(logits, dim=-1).squeeze().cpu().tolist()
-
         scores = dict(zip(self.labels, probs))
-        top_label = max(scores, key=scores.get)
-        confidence = scores[top_label]
 
-        action = self._decide(top_label, confidence)
-        return {"sentiment": top_label, "confidence": round(confidence, 4), "action": action}
+        top_label  = max(scores, key=scores.get)
+        confidence = round(scores[top_label], 4)
 
-    @staticmethod
-    def _decide(sentiment: str, confidence: float) -> str:
-        if sentiment == "positive":
-            if confidence >= SINGLE_BUY_THRESHOLD:
-                return "BUY"
-            if confidence >= HOLD_LOWER_THRESHOLD:
-                return "HOLD"
-        if sentiment == "negative":
-            return "SELL"
-        return "HOLD"
+        return {
+            "sentiment":        top_label,
+            "confidence":       confidence,
+            "positive_score":   round(scores["positive"], 4),
+            "negative_score":   round(scores["negative"], 4),
+            "neutral_score":    round(scores["neutral"],  4),
+        }
 
 
 # ─────────────────────────────────────────────
-# C. SMART COMPANY DETECTION
+# C. DYNAMIC COMPANY EXTRACTION (no whitelist)
 # ─────────────────────────────────────────────
 def load_nlp() -> spacy.Language:
     try:
@@ -211,170 +184,353 @@ def load_nlp() -> spacy.Language:
         log.info("✅ spaCy model loaded.")
         return nlp
     except OSError:
-        log.error("spaCy model not found. Run: python -m spacy download en_core_web_sm")
+        log.error("Run: python -m spacy download en_core_web_sm")
         raise
 
 
-def extract_company(headline: str, nlp: spacy.Language) -> str | None:
-    """Extract the first whitelisted NSE company from a headline."""
-    doc = nlp(headline)
+def is_valid_company(name: str) -> bool:
+    """
+    Filter out generic/noise entities.
+    Accept proper named companies (2+ chars, not a noise word, not all digits).
+    """
+    clean = name.strip().lower()
+
+    if len(clean) < 3:
+        return False
+    if clean in NOISE_WORDS:
+        return False
+    if any(noise in clean for noise in ["government", "ministry", "court", "reserve bank"]):
+        return False
+    if re.fullmatch(r"[\d\s\W]+", clean):
+        return False
+
+    return True
+
+
+def extract_companies(text: str, nlp: spacy.Language) -> list[str]:
+    """Extract all valid ORG entities from text. Returns list of canonical names."""
+    doc = nlp(text)
+    companies = []
+    seen = set()
+
     for ent in doc.ents:
-        if ent.label_ == "ORG":
-            name_lower = ent.text.strip().lower()
-            if name_lower in NOISE_ENTITIES:
-                continue
-            for key in NSE_WHITELIST:
-                if key in name_lower or name_lower in key:
-                    return COMPANY_CANONICAL.get(key, ent.text.strip())
-    return None
+        if ent.label_ in ("ORG", "PRODUCT"):
+            name = ent.text.strip()
+            # Clean up suffixes for canonical name
+            canonical = re.sub(
+                r"\b(Ltd\.?|Limited|Corp\.?|Corporation|Inc\.?|Pvt\.?|Private|Group|Holdings?|Ventures?|Capital)\b",
+                "", name, flags=re.IGNORECASE
+            ).strip().rstrip(".,")
+
+            if canonical and is_valid_company(canonical) and canonical.lower() not in seen:
+                seen.add(canonical.lower())
+                companies.append(canonical)
+
+    return companies
 
 
 # ─────────────────────────────────────────────
-# D. MULTI-NEWS AGGREGATION
+# D. RISE / FALL PREDICTION ENGINE
 # ─────────────────────────────────────────────
-def aggregate_signals(
-    company_data: dict[str, list[dict]],
-) -> dict[str, dict]:
+def predict_stock_movement(records: list[dict]) -> dict:
     """
-    For each company with multiple headlines, compute:
-      - avg_confidence
-      - majority sentiment
-      - final action
+    Aggregate multiple headline sentiments for one company.
+
+    Returns:
+        prediction: RISE | FALL | NEUTRAL
+        confidence: float (0–1)
+        reasoning:  str
     """
-    aggregated: dict[str, dict] = {}
+    if not records:
+        return {"prediction": "NEUTRAL", "confidence": 0.0, "reasoning": "No data"}
 
-    for company, records in company_data.items():
-        positives = [r for r in records if r["sentiment"] == "positive"]
-        negatives = [r for r in records if r["sentiment"] == "negative"]
-        avg_conf  = round(sum(r["confidence"] for r in records) / len(records), 4)
+    total     = len(records)
+    positives = [r for r in records if r["sentiment"] == "positive"]
+    negatives = [r for r in records if r["sentiment"] == "negative"]
 
-        if len(positives) > len(negatives) and avg_conf >= BUY_CONFIDENCE_THRESHOLD:
-            final_action = "BUY"
-        elif len(negatives) >= len(positives):
-            final_action = "SELL"
-        else:
-            final_action = "HOLD"
+    # Weighted score: +positive_score - negative_score for each article
+    weighted_scores = [
+        r["positive_score"] - r["negative_score"]
+        for r in records
+    ]
+    avg_weighted = sum(weighted_scores) / total
 
-        # Best BUY headline as "top reason"
-        best = max(records, key=lambda r: r["confidence"] if r["sentiment"] == "positive" else 0)
+    # Avg confidence of the dominant sentiment
+    pos_avg_conf = sum(r["positive_score"] for r in records) / total
+    neg_avg_conf = sum(r["negative_score"] for r in records) / total
 
-        aggregated[company] = {
-            "avg_confidence": avg_conf,
-            "final_action": final_action,
-            "news_count": len(records),
-            "positive_count": len(positives),
-            "top_headline": best["headline"],
-        }
+    pos_ratio = len(positives) / total
+    neg_ratio = len(negatives) / total
 
-    return aggregated
+    # Decision logic
+    if avg_weighted > 0.15 and pos_ratio >= 0.6 and pos_avg_conf >= BUY_CONFIDENCE_THRESHOLD:
+        prediction = "RISE"
+        confidence = round(pos_avg_conf, 4)
+        reasoning  = (
+            f"{len(positives)}/{total} articles positive · "
+            f"avg sentiment score +{avg_weighted:.2f}"
+        )
+
+    elif avg_weighted < -0.15 and neg_ratio >= 0.6 and neg_avg_conf >= SELL_CONFIDENCE_THRESHOLD:
+        prediction = "FALL"
+        confidence = round(neg_avg_conf, 4)
+        reasoning  = (
+            f"{len(negatives)}/{total} articles negative · "
+            f"avg sentiment score {avg_weighted:.2f}"
+        )
+
+    else:
+        prediction = "NEUTRAL"
+        confidence = round(max(pos_avg_conf, neg_avg_conf), 4)
+        reasoning  = (
+            f"Mixed signals ({len(positives)} pos / {len(negatives)} neg / "
+            f"{total - len(positives) - len(negatives)} neu)"
+        )
+
+    return {
+        "prediction": prediction,
+        "confidence": confidence,
+        "reasoning":  reasoning,
+        "pos_ratio":  round(pos_ratio, 2),
+        "neg_ratio":  round(neg_ratio, 2),
+        "article_count": total,
+    }
 
 
 # ─────────────────────────────────────────────
-# E. MARKET CONTEXT FILTER
+# E. MARKET MOOD
 # ─────────────────────────────────────────────
-def market_mood(all_results: list[dict]) -> str:
-    """Return 'Bearish', 'Bullish', or 'Neutral' based on overall headlines."""
+def overall_market_mood(all_results: list[dict]) -> str:
     if not all_results:
         return "Neutral"
-    neg_count = sum(1 for r in all_results if r["sentiment"] == "negative")
-    ratio = neg_count / len(all_results)
-    if ratio > BEARISH_MARKET_RATIO:
+    neg = sum(1 for r in all_results if r["sentiment"] == "negative")
+    pos = sum(1 for r in all_results if r["sentiment"] == "positive")
+    n   = len(all_results)
+    if neg / n > BEARISH_MARKET_RATIO:
         return "Bearish"
-    pos_count = sum(1 for r in all_results if r["sentiment"] == "positive")
-    if pos_count / len(all_results) > BEARISH_MARKET_RATIO:
+    if pos / n > BEARISH_MARKET_RATIO:
         return "Bullish"
     return "Neutral"
 
 
 # ─────────────────────────────────────────────
-# G. TELEGRAM ALERTS
+# F. SAVE TO docs/alerts.json
+# ─────────────────────────────────────────────
+def save_alert(data: dict) -> None:
+    try:
+        ALERTS_LOG.parent.mkdir(exist_ok=True)
+        alerts = []
+        if ALERTS_LOG.exists():
+            with open(ALERTS_LOG, "r") as f:
+                alerts = json.load(f)
+        alerts.insert(0, data)
+        with open(ALERTS_LOG, "w") as f:
+            json.dump(alerts, f, indent=2)
+        log.info(f"💾 Saved to {ALERTS_LOG}")
+    except Exception as exc:
+        log.error(f"Failed to save: {exc}")
+
+
+# ─────────────────────────────────────────────
+# G. TELEGRAM
 # ─────────────────────────────────────────────
 def send_telegram(message: str) -> None:
     if not BOT_TOKEN or not CHAT_ID:
-        log.warning("⚠ BOT_TOKEN or CHAT_ID not set. Skipping Telegram alert.")
+        log.warning("⚠ BOT_TOKEN / CHAT_ID not set.")
         return
-    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": CHAT_ID, "text": message, "parse_mode": "HTML"}
     try:
-        resp = requests.post(url, json=payload, timeout=10)
+        resp = requests.post(
+            f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+            json={"chat_id": CHAT_ID, "text": message, "parse_mode": "HTML"},
+            timeout=10,
+        )
         resp.raise_for_status()
-        log.info("📨 Telegram alert sent.")
+        log.info("📨 Telegram sent.")
     except requests.exceptions.RequestException as exc:
-        log.error(f"Telegram send failed: {exc}")
+        log.error(f"Telegram failed: {exc}")
 
 
-def format_buy_alert(company: str, data: dict, mood: str) -> str:
+def format_rise_alert(company: str, pred: dict, top_headline: str, mood: str) -> str:
+    conf_pct = round(pred["confidence"] * 100)
+    bar      = "█" * (conf_pct // 10) + "░" * (10 - conf_pct // 10)
     return (
-        f"📈 <b>AI STOCK BUY SIGNAL</b>\n\n"
+        f"📈 <b>STOCK RISE PREDICTION</b>\n\n"
         f"🏢 <b>Company:</b> {company}\n"
-        f"📊 <b>Confidence:</b> {data['avg_confidence']:.0%}\n"
-        f"📰 <b>News Count:</b> {data['news_count']} headline(s) "
-        f"({data['positive_count']} positive)\n"
-        f"💡 <b>Top Reason:</b> {data['top_headline']}\n"
-        f"🌐 <b>Market Mood:</b> {mood}"
+        f"🔮 <b>Prediction:</b> <b>RISE ▲</b>\n"
+        f"📊 <b>Confidence:</b> {conf_pct}%\n"
+        f"     <code>{bar}</code>\n"
+        f"📰 <b>Articles analysed:</b> {pred['article_count']} "
+        f"({round(pred['pos_ratio']*100)}% positive)\n"
+        f"🧠 <b>Reasoning:</b> {pred['reasoning']}\n"
+        f"💡 <b>Top Headline:</b> {top_headline}\n"
+        f"🌐 <b>Market Mood:</b> {mood}\n"
+        f"⏰ <b>Signal Time:</b> {datetime.now().strftime('%d %b %Y %H:%M')} IST"
+    )
+
+
+def format_fall_alert(company: str, pred: dict, top_headline: str, mood: str) -> str:
+    conf_pct = round(pred["confidence"] * 100)
+    bar      = "█" * (conf_pct // 10) + "░" * (10 - conf_pct // 10)
+    return (
+        f"📉 <b>STOCK FALL PREDICTION</b>\n\n"
+        f"🏢 <b>Company:</b> {company}\n"
+        f"🔮 <b>Prediction:</b> <b>FALL ▼</b>\n"
+        f"📊 <b>Confidence:</b> {conf_pct}%\n"
+        f"     <code>{bar}</code>\n"
+        f"📰 <b>Articles analysed:</b> {pred['article_count']} "
+        f"({round(pred['neg_ratio']*100)}% negative)\n"
+        f"🧠 <b>Reasoning:</b> {pred['reasoning']}\n"
+        f"💡 <b>Top Headline:</b> {top_headline}\n"
+        f"🌐 <b>Market Mood:</b> {mood}\n"
+        f"⏰ <b>Signal Time:</b> {datetime.now().strftime('%d %b %Y %H:%M')} IST"
     )
 
 
 # ─────────────────────────────────────────────
 # MAIN PIPELINE
 # ─────────────────────────────────────────────
-    log.info("\n── COMPANY SIGNAL SUMMARY ──")
-    buy_alerts: list[str] = []
+def main() -> None:
+    start = time.time()
+    now   = datetime.now()
 
-    for company, data in aggregated.items():
-        action = data["final_action"]
+    log.info("=" * 65)
+    log.info("  AI PRE-MARKET STOCK INTELLIGENCE SYSTEM v2 — STARTING")
+    log.info("=" * 65)
 
-        # Bearish market → suppress BUY
-        if mood == "Bearish" and action == "BUY":
-            action = "HOLD"
-            log.info(f"  {company:30s} | conf={data['avg_confidence']:.2f} | BUY → HOLD (bearish market)")
-        else:
-            log.info(f"  {company:30s} | conf={data['avg_confidence']:.2f} | {action}")
+    # ── Load models ──────────────────────────────────────────────────
+    engine = SentimentEngine()
+    nlp    = load_nlp()
 
-        # Send only BUY alerts
-        if action == "BUY" and company not in alerted_set:
-            alerted_set.add(company)
-            buy_alerts.append(format_buy_alert(company, data, mood))
+    # ── Fetch news ───────────────────────────────────────────────────
+    articles = fetch_news()
+    if not articles:
+        log.warning("No articles fetched.")
+        send_telegram("⚠ No news articles could be fetched today.")
+        save_alert({"type": "no_signal", "date": now.strftime("%Y-%m-%d"),
+                    "time": now.strftime("%H:%M"), "market_mood": "Unknown"})
+        return
 
-    # ── SEND TELEGRAM ─────────────────────────
-    if buy_alerts:
-        for alert in buy_alerts:
-            send_telegram(alert)
-    else:
-        send_telegram(
-            "🔕 <b>No strong BUY signals today.</b>\n"
-            f"Market sentiment: <b>{mood}</b>. Staying cautious."
+    # ── Analyse each article + extract companies ──────────────────────
+    company_articles: dict[str, list[dict]] = defaultdict(list)
+    all_sentiments:   list[dict]            = []
+
+    for article in articles:
+        text   = article["full_text"]
+        result = engine.analyse(text)
+        result.update(article)       # merge sentiment + article metadata
+        all_sentiments.append(result)
+
+        companies = extract_companies(text, nlp)
+        for company in companies:
+            company_articles[company].append(result)
+
+        log.info(
+            f"  [{result['sentiment'].upper():8s}] {result['confidence']:.2f} | "
+            f"{article['title'][:70]}"
         )
 
-    # ── SAVE DASHBOARD DATA (VERY IMPORTANT) ──
-    import json
+    log.info(f"\n📊 Companies detected: {len(company_articles)}")
+    for c, arts in company_articles.items():
+        log.info(f"    {c:35s} → {len(arts)} article(s)")
 
-    dashboard_data = {
-        "date": time.strftime("%d %b %Y"),
-        "market_mood": mood,
-        "buy_signals": len(buy_alerts),
-        "avg_confidence": round(
-            sum(d["avg_confidence"] for d in aggregated.values()) / len(aggregated)
-            if aggregated else 0, 2
-        ),
-        "signals": []
-    }
+    # ── Market mood ───────────────────────────────────────────────────
+    mood = overall_market_mood(all_sentiments)
+    log.info(f"\n🌐 Overall Market Mood: {mood}")
 
-    for company, data in aggregated.items():
-        dashboard_data["signals"].append({
-            "name": company,
-            "sector": "N/A",
-            "confidence": int(data["avg_confidence"] * 100),
-            "action": data["final_action"].lower(),
-            "reason": data["top_headline"]
+    # ── Predict per company ───────────────────────────────────────────
+    log.info("\n── PREDICTIONS ──")
+    signals_sent = 0
+    alerted      = set()
+
+    for company, records in company_articles.items():
+
+        # Need at least MIN_HEADLINES_FOR_SIGNAL articles to make a call
+        if len(records) < MIN_HEADLINES_FOR_SIGNAL:
+            log.info(f"  {company:35s} → SKIP (only {len(records)} article)")
+            continue
+
+        pred = predict_stock_movement(records)
+        log.info(
+            f"  {company:35s} → {pred['prediction']:7s} "
+            f"conf={pred['confidence']:.2f} | {pred['reasoning']}"
+        )
+
+        if company in alerted:
+            continue
+
+        # Top headline = highest confidence article for this company
+        top = max(records, key=lambda r: r["confidence"])
+        top_headline = top["title"]
+
+        # ── RISE signal ───────────────────────────────────────────────
+        if pred["prediction"] == "RISE":
+            # Suppress if market is Bearish
+            if mood == "Bearish":
+                log.info(f"    ↳ RISE suppressed (Bearish market)")
+                continue
+
+            msg = format_rise_alert(company, pred, top_headline, mood)
+            send_telegram(msg)
+            save_alert({
+                "type":          "rise",
+                "date":          now.strftime("%Y-%m-%d"),
+                "time":          now.strftime("%H:%M"),
+                "company":       company,
+                "prediction":    "RISE",
+                "confidence":    str(round(pred["confidence"] * 100)),
+                "article_count": str(pred["article_count"]),
+                "pos_ratio":     str(round(pred["pos_ratio"] * 100)),
+                "reasoning":     pred["reasoning"],
+                "top_headline":  top_headline,
+                "top_source":    top.get("source", ""),
+                "market_mood":   mood,
+            })
+            alerted.add(company)
+            signals_sent += 1
+
+        # ── FALL signal ───────────────────────────────────────────────
+        elif pred["prediction"] == "FALL":
+            msg = format_fall_alert(company, pred, top_headline, mood)
+            send_telegram(msg)
+            save_alert({
+                "type":          "fall",
+                "date":          now.strftime("%Y-%m-%d"),
+                "time":          now.strftime("%H:%M"),
+                "company":       company,
+                "prediction":    "FALL",
+                "confidence":    str(round(pred["confidence"] * 100)),
+                "article_count": str(pred["article_count"]),
+                "neg_ratio":     str(round(pred["neg_ratio"] * 100)),
+                "reasoning":     pred["reasoning"],
+                "top_headline":  top_headline,
+                "top_source":    top.get("source", ""),
+                "market_mood":   mood,
+            })
+            alerted.add(company)
+            signals_sent += 1
+
+    # ── No signals ────────────────────────────────────────────────────
+    if signals_sent == 0:
+        send_telegram(
+            f"🔕 <b>No strong signals today.</b>\n"
+            f"Market mood: <b>{mood}</b>\n"
+            f"Articles analysed: {len(articles)}\n"
+            f"Companies found: {len(company_articles)}\n"
+            f"Staying cautious — no high-confidence RISE/FALL predictions."
+        )
+        save_alert({
+            "type":        "no_signal",
+            "date":        now.strftime("%Y-%m-%d"),
+            "time":        now.strftime("%H:%M"),
+            "market_mood": mood,
+            "articles_analysed": len(articles),
+            "companies_found":   len(company_articles),
         })
 
-    with open("data.json", "w") as f:
-        json.dump(dashboard_data, f, indent=4)
-
-    log.info("📊 data.json updated")
-
-    # ── END ───────────────────────────────────
     elapsed = round(time.time() - start, 2)
-    log.info(f"\n✅ Pipeline complete in {elapsed}s. Alerts sent: {len(buy_alerts)}")
-    log.info("=" * 60)
+    log.info(f"\n✅ Done in {elapsed}s · Signals sent: {signals_sent}")
+    log.info("=" * 65)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,333 +1,83 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>AI Stock Intelligence — Signal Log</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Fraunces:ital,wght@0,300;0,400;0,600;1,300&display=swap" rel="stylesheet"/>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Stock Signals</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
 <style>
-:root{
-  --bg:#07090d;--bg2:#0d1117;--bg3:#161b22;--bg4:#1c2430;
-  --border:rgba(48,211,120,0.10);--border2:rgba(48,211,120,0.22);
-  --green:#30d378;--green2:#1a7a42;--green-bg:rgba(48,211,120,0.07);
-  --red:#e05c5c;--red2:#7a1a1a;--red-bg:rgba(224,92,92,0.07);
-  --amber:#f0a000;--amber-bg:rgba(240,160,0,0.08);
-  --blue:#58a6ff;
-  --text:#cdd9e5;--text2:#768390;--text3:#3d444d;
-  --mono:'JetBrains Mono',monospace;--serif:'Fraunces',serif;
+body {
+  font-family: 'Inter', sans-serif;
+  background: #f8f6ff;
+  color: #2d2a3a;
+  padding: 40px 20px;
+  max-width: 800px;
+  margin: auto;
 }
-*{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
-body{font-family:var(--mono);background:var(--bg);color:var(--text);min-height:100vh}
-body::before{
-  content:'';position:fixed;inset:0;
-  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
-  pointer-events:none;z-index:0;opacity:.4;
+
+h1 {
+  text-align: center;
+  margin-bottom: 30px;
 }
-body::after{
-  content:'';position:fixed;top:-200px;left:50%;transform:translateX(-50%);
-  width:700px;height:400px;
-  background:radial-gradient(ellipse,rgba(48,211,120,0.05) 0%,transparent 70%);
-  pointer-events:none;z-index:0;
+
+.alert {
+  padding: 16px;
+  margin-bottom: 15px;
+  border-radius: 10px;
+  background: white;
+  border-left: 5px solid #ccc;
 }
-.wrap{position:relative;z-index:1;max-width:800px;margin:0 auto;padding:0 20px 80px}
 
-/* HEADER */
-header{padding:52px 0 40px;border-bottom:1px solid var(--border);margin-bottom:36px}
-.header-tag{font-size:10px;letter-spacing:.15em;color:var(--green);text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:8px}
-.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;display:inline-block}
-@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(48,211,120,.4)}50%{opacity:.6;box-shadow:0 0 0 6px rgba(48,211,120,0)}}
-h1{font-family:var(--serif);font-size:clamp(26px,5vw,40px);font-weight:300;color:#e6edf3;line-height:1.15;margin-bottom:14px;letter-spacing:-.01em}
-h1 em{font-style:italic;color:var(--green)}
-.header-sub{font-size:12px;color:var(--text2);line-height:1.8;max-width:580px}
-.header-meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
-.pill{font-size:10px;letter-spacing:.06em;padding:4px 10px;border-radius:20px;border:1px solid var(--border2);color:var(--text2);text-decoration:none;transition:all .15s}
-.pill:hover{border-color:var(--green);color:var(--green)}
-.pill.green{border-color:var(--green2);color:var(--green);background:var(--green-bg)}
+.rise { border-color: #4ade80; }
+.fall { border-color: #f87171; }
+.neutral { border-color: #facc15; }
 
-/* STATS */
-.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:32px}
-.stat{background:var(--bg2);padding:16px 12px;text-align:center}
-.stat-val{font-size:22px;font-weight:600;color:var(--text);line-height:1;margin-bottom:4px}
-.stat-val.green{color:var(--green)}
-.stat-val.red{color:var(--red)}
-.stat-label{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3)}
-
-/* FILTERS */
-.filters{display:flex;align-items:center;gap:8px;margin-bottom:24px;flex-wrap:wrap}
-.filter-label{font-size:10px;letter-spacing:.08em;color:var(--text3);text-transform:uppercase}
-.filter-btn{font-family:var(--mono);font-size:10px;letter-spacing:.05em;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;transition:all .15s;text-transform:uppercase}
-.filter-btn:hover{border-color:var(--border2);color:var(--text)}
-.filter-btn.active{background:var(--green-bg);border-color:var(--green2);color:var(--green)}
-.filter-btn.red-active{background:var(--red-bg);border-color:var(--red2);color:var(--red)}
-
-/* SECTION */
-.section-label{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--text3);margin-bottom:12px;display:flex;align-items:center;gap:10px}
-.section-label::after{content:'';flex:1;height:1px;background:var(--border)}
-
-/* CARDS */
-.msg-group{margin-bottom:32px}
-.msg-date{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;padding-left:2px}
-.msg{background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden;transition:border-color .2s,transform .15s;animation:fadeUp .4s ease both}
-.msg:hover{transform:translateY(-1px)}
-.msg.rise:hover{border-color:rgba(48,211,120,.3)}
-.msg.fall:hover{border-color:rgba(224,92,92,.3)}
-@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-
-/* left accent bar */
-.msg.rise{border-left:3px solid var(--green)}
-.msg.fall{border-left:3px solid var(--red)}
-.msg.no_signal{border-left:3px solid var(--text3)}
-
-.msg-header{display:flex;align-items:center;justify-content:space-between;padding:13px 18px 11px;border-bottom:1px solid var(--border);gap:10px}
-.msg-type{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:600;letter-spacing:.06em}
-.msg-icon{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
-.icon-rise{background:var(--green-bg);border:1px solid var(--green2)}
-.icon-fall{background:var(--red-bg);border:1px solid var(--red2)}
-.icon-no{background:var(--bg3);border:1px solid var(--border)}
-.type-rise{color:var(--green)}
-.type-fall{color:var(--red)}
-.type-no{color:var(--text2)}
-.msg-time{font-size:10px;color:var(--text3);flex-shrink:0}
-
-.msg-body{padding:16px 18px}
-.sig-grid{display:grid;grid-template-columns:1fr 1fr;gap:0}
-.sig-row{display:flex;flex-direction:column;gap:3px;padding:10px 12px 10px 0;border-bottom:1px solid var(--border)}
-.sig-row:nth-child(even){padding-left:12px;border-left:1px solid var(--border)}
-.sig-row.full{grid-column:1/-1;padding-left:0;border-left:none;border-bottom:none}
-.sig-row:last-child{border-bottom:none}
-.sig-key{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3)}
-.sig-val{font-size:13px;color:var(--text);line-height:1.4}
-.sig-val.green{color:var(--green)}
-.sig-val.red{color:var(--red)}
-.sig-val.amber{color:var(--amber)}
-.sig-val.italic{font-style:italic;color:var(--text2);font-size:12px}
-
-.conf-bar{margin-top:6px;height:3px;background:var(--bg4);border-radius:2px;overflow:hidden}
-.conf-bar-fill{height:100%;border-radius:2px}
-.conf-bar-fill.green{background:var(--green)}
-.conf-bar-fill.red{background:var(--red)}
-
-.no-signal-text{font-size:13px;color:var(--text2);line-height:1.7}
-.mood-chip{display:inline-block;font-size:10px;padding:2px 8px;border-radius:4px;margin-left:6px;vertical-align:middle}
-.src-tag{font-size:9px;color:var(--text3);font-style:italic;margin-top:4px}
-
-/* LOADING */
-#loading{text-align:center;padding:60px 0;color:var(--text3);font-size:11px;letter-spacing:.1em}
-.spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 14px}
-@keyframes spin{to{transform:rotate(360deg)}}
-#empty{text-align:center;padding:60px 20px;color:var(--text3)}
-#empty .e-text{font-size:13px;line-height:1.7;color:var(--text2);margin-top:10px}
-
-/* FOOTER */
-footer{border-top:1px solid var(--border);padding-top:28px;margin-top:48px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
-.footer-left{font-size:11px;color:var(--text3);line-height:1.7}
-.footer-links{display:flex;gap:14px}
-.footer-links a{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);text-decoration:none;transition:color .15s}
-.footer-links a:hover{color:var(--green)}
-
-@media(max-width:600px){
-  .stats{grid-template-columns:repeat(3,1fr)}
-  .sig-grid{grid-template-columns:1fr}
-  .sig-row{padding-left:0!important;border-left:none!important}
-  .sig-row.full{grid-column:auto}
+.small {
+  font-size: 12px;
+  color: #666;
 }
 </style>
 </head>
+
 <body>
-<div class="wrap">
 
-  <header>
-    <div class="header-tag"><span class="live-dot"></span>Live AI Signal Log &nbsp;·&nbsp; NSE India &nbsp;·&nbsp; NewsAPI + FinBERT</div>
-    <h1>Stock <em>Rise & Fall</em><br>Predictions</h1>
-    <p class="header-sub">
-      Every morning at <strong style="color:var(--text)">7:30 AM IST</strong>, this system fetches Indian business news from NewsAPI,
-      runs every article through <strong style="color:var(--text)">FinBERT</strong> financial sentiment analysis,
-      dynamically detects <strong style="color:var(--text)">any company</strong> mentioned,
-      and predicts whether each stock will <span style="color:var(--green)">RISE ▲</span> or <span style="color:var(--red)">FALL ▼</span>.
-      Every signal sent to Telegram is logged here — publicly, in real time.
-    </p>
-    <div class="header-meta">
-      <span class="pill green">● FinBERT · ProsusAI</span>
-      <span class="pill">NewsAPI</span>
-      <span class="pill">spaCy NER</span>
-      <span class="pill">GitHub Actions</span>
-      <span class="pill">Telegram Bot</span>
-      <a class="pill" href="https://github.com/sumukh964/AI_stock_notifier" target="_blank">↗ GitHub</a>
-    </div>
-  </header>
+<h1>📊 AI Stock Alerts</h1>
 
-  <div class="stats">
-    <div class="stat"><div class="stat-val" id="s-total">—</div><div class="stat-label">Total Runs</div></div>
-    <div class="stat"><div class="stat-val green" id="s-rise">—</div><div class="stat-label">RISE Signals</div></div>
-    <div class="stat"><div class="stat-val red" id="s-fall">—</div><div class="stat-label">FALL Signals</div></div>
-    <div class="stat"><div class="stat-val" id="s-nosig">—</div><div class="stat-label">No Signal Days</div></div>
-    <div class="stat"><div class="stat-val" id="s-conf">—</div><div class="stat-label">Avg Confidence</div></div>
-  </div>
-
-  <div class="filters">
-    <span class="filter-label">Filter</span>
-    <button class="filter-btn active" onclick="setFilter('all',this,'active')">All</button>
-    <button class="filter-btn" onclick="setFilter('rise',this,'active')">RISE ▲</button>
-    <button class="filter-btn" onclick="setFilter('fall',this,'red-active')">FALL ▼</button>
-    <button class="filter-btn" onclick="setFilter('no_signal',this,'active')">No Signal</button>
-  </div>
-
-  <div class="section-label">Signal history</div>
-  <div id="loading"><div class="spinner"></div>Loading signals…</div>
-  <div id="feed"></div>
-  <div id="empty" style="display:none">
-    <div style="font-size:32px;opacity:.3">◎</div>
-    <div class="e-text">No signals match this filter.</div>
-  </div>
-
-  <footer>
-    <div class="footer-left">
-      Built by <strong style="color:var(--text)">Sumukh R</strong> · Final Year Project 2026<br>
-      <span style="font-size:10px">Not financial advice. Educational &amp; portfolio purposes only.</span>
-    </div>
-    <div class="footer-links">
-      <a href="https://github.com/sumukh964/AI_stock_notifier" target="_blank">GitHub</a>
-      <a href="https://github.com/sumukh964/AI_stock_notifier/actions" target="_blank">Actions</a>
-    </div>
-  </footer>
-</div>
+<div id="alerts">Loading...</div>
 
 <script>
-let ALL = [], FILTER = 'all';
+fetch("alerts.json")
+  .then(res => res.json())
+  .then(data => {
+    const container = document.getElementById("alerts");
+    container.innerHTML = "";
 
-async function load() {
-  try {
-    const r = await fetch('alerts.json?v=' + Date.now());
-    if (!r.ok) throw new Error();
-    ALL = await r.json();
-  } catch { ALL = SAMPLE; }
-  document.getElementById('loading').style.display = 'none';
-  stats(); render();
-}
+    if (!data.length) {
+      container.innerHTML = "No alerts available";
+      return;
+    }
 
-function stats() {
-  const rise  = ALL.filter(a=>a.type==='rise');
-  const fall  = ALL.filter(a=>a.type==='fall');
-  const confs = [...rise,...fall].map(a=>parseFloat(a.confidence)).filter(Boolean);
-  const avg   = confs.length ? Math.round(confs.reduce((a,b)=>a+b,0)/confs.length) : 0;
-  document.getElementById('s-total').textContent = ALL.length;
-  document.getElementById('s-rise').textContent  = rise.length;
-  document.getElementById('s-fall').textContent  = fall.length;
-  document.getElementById('s-nosig').textContent = ALL.filter(a=>a.type==='no_signal').length;
-  document.getElementById('s-conf').textContent  = avg ? avg+'%' : '—';
-}
+    data.forEach(a => {
+      let cls = "neutral";
+      if (a.prediction === "RISE") cls = "rise";
+      if (a.prediction === "FALL") cls = "fall";
 
-function setFilter(f, el, cls) {
-  FILTER = f;
-  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active','red-active'));
-  el.classList.add(cls);
-  render();
-}
+      const div = document.createElement("div");
+      div.className = "alert " + cls;
 
-function render() {
-  const list = FILTER==='all' ? ALL : ALL.filter(a=>a.type===FILTER);
-  const feed = document.getElementById('feed');
-  document.getElementById('empty').style.display = list.length?'none':'block';
-  if (!list.length) { feed.innerHTML=''; return; }
+      div.innerHTML = `
+        <b>${a.company}</b><br>
+        ${a.prediction} (${a.confidence}%)<br>
+        ${a.reason}<br>
+        <span class="small">${a.time}</span>
+      `;
 
-  const groups = {};
-  list.forEach(a=>{ const d=a.date||'Unknown'; if(!groups[d]) groups[d]=[]; groups[d].push(a); });
-  const dates = Object.keys(groups).sort((a,b)=>new Date(b)-new Date(a));
-
-  let idx=0;
-  feed.innerHTML = dates.map(date=>`
-    <div class="msg-group">
-      <div class="msg-date">${fmtDate(date)}</div>
-      ${groups[date].map(a=>card(a,idx++)).join('')}
-    </div>`).join('');
-}
-
-function card(a, i) {
-  const delay = Math.min(i*60,400)+'ms';
-
-  if (a.type==='rise') {
-    const c = parseFloat(a.confidence)||0;
-    return `
-    <div class="msg rise" style="animation-delay:${delay}">
-      <div class="msg-header">
-        <div class="msg-type"><div class="msg-icon icon-rise">📈</div><span class="type-rise">STOCK RISE PREDICTION ▲</span></div>
-        <span class="msg-time">${a.time||''} IST</span>
-      </div>
-      <div class="msg-body">
-        <div class="sig-grid">
-          <div class="sig-row"><span class="sig-key">🏢 Company</span><span class="sig-val green">${a.company||'—'}</span></div>
-          <div class="sig-row"><span class="sig-key">📊 Confidence</span><span class="sig-val green">${c}%</span><div class="conf-bar"><div class="conf-bar-fill green" style="width:${c}%"></div></div></div>
-          <div class="sig-row"><span class="sig-key">📰 Articles</span><span class="sig-val">${a.article_count||'—'} analysed (${a.pos_ratio||'—'}% positive)</span></div>
-          <div class="sig-row"><span class="sig-key">🌐 Market Mood</span><span class="sig-val ${a.market_mood==='Bullish'?'green':a.market_mood==='Bearish'?'red':''}">${a.market_mood||'—'}</span></div>
-          <div class="sig-row full"><span class="sig-key">🧠 Reasoning</span><span class="sig-val" style="color:var(--text2)">${a.reasoning||'—'}</span></div>
-          <div class="sig-row full"><span class="sig-key">💡 Top Headline</span><span class="sig-val italic">"${a.top_headline||'—'}"</span>${a.top_source?`<span class="src-tag">— ${a.top_source}</span>`:''}</div>
-        </div>
-      </div>
-    </div>`;
-  }
-
-  if (a.type==='fall') {
-    const c = parseFloat(a.confidence)||0;
-    return `
-    <div class="msg fall" style="animation-delay:${delay}">
-      <div class="msg-header">
-        <div class="msg-type"><div class="msg-icon icon-fall">📉</div><span class="type-fall">STOCK FALL PREDICTION ▼</span></div>
-        <span class="msg-time">${a.time||''} IST</span>
-      </div>
-      <div class="msg-body">
-        <div class="sig-grid">
-          <div class="sig-row"><span class="sig-key">🏢 Company</span><span class="sig-val red">${a.company||'—'}</span></div>
-          <div class="sig-row"><span class="sig-key">📊 Confidence</span><span class="sig-val red">${c}%</span><div class="conf-bar"><div class="conf-bar-fill red" style="width:${c}%"></div></div></div>
-          <div class="sig-row"><span class="sig-key">📰 Articles</span><span class="sig-val">${a.article_count||'—'} analysed (${a.neg_ratio||'—'}% negative)</span></div>
-          <div class="sig-row"><span class="sig-key">🌐 Market Mood</span><span class="sig-val ${a.market_mood==='Bullish'?'green':a.market_mood==='Bearish'?'red':''}">${a.market_mood||'—'}</span></div>
-          <div class="sig-row full"><span class="sig-key">🧠 Reasoning</span><span class="sig-val" style="color:var(--text2)">${a.reasoning||'—'}</span></div>
-          <div class="sig-row full"><span class="sig-key">💡 Top Headline</span><span class="sig-val italic">"${a.top_headline||'—'}"</span>${a.top_source?`<span class="src-tag">— ${a.top_source}</span>`:''}</div>
-        </div>
-      </div>
-    </div>`;
-  }
-
-  if (a.type==='no_signal') {
-    const mc = a.market_mood==='Bearish'?'var(--red)':a.market_mood==='Bullish'?'var(--green)':'var(--text2)';
-    return `
-    <div class="msg no_signal" style="animation-delay:${delay}">
-      <div class="msg-header">
-        <div class="msg-type"><div class="msg-icon icon-no">🔕</div><span class="type-no">NO STRONG SIGNALS</span></div>
-        <span class="msg-time">${a.time||''} IST</span>
-      </div>
-      <div class="msg-body">
-        <p class="no-signal-text">
-          No high-confidence RISE or FALL predictions today.
-          ${a.articles_analysed?`${a.articles_analysed} articles analysed, ${a.companies_found} companies found.`:''}
-          Market sentiment cautious.
-          <span class="mood-chip" style="background:rgba(255,255,255,0.04);color:${mc};border:1px solid ${mc}40">${a.market_mood||'Neutral'}</span>
-        </p>
-      </div>
-    </div>`;
-  }
-  return '';
-}
-
-function fmtDate(d) {
-  try { return new Date(d).toLocaleDateString('en-IN',{weekday:'long',year:'numeric',month:'long',day:'numeric'}); }
-  catch { return d; }
-}
-
-const SAMPLE = [
-  {type:'rise',date:'2026-04-29',time:'07:31',company:'Reliance Industries',confidence:'89',article_count:'4',pos_ratio:'80',reasoning:'4/4 articles positive · avg sentiment score +0.62',top_headline:'Reliance posts record Q4 profit on Jio growth and retail expansion',top_source:'Economic Times',market_mood:'Bullish'},
-  {type:'rise',date:'2026-04-29',time:'07:32',company:'HDFC Bank',confidence:'83',article_count:'3',pos_ratio:'100',reasoning:'3/3 articles positive · avg sentiment score +0.58',top_headline:'HDFC Bank sees surge in retail loan disbursals in March quarter',top_source:'Moneycontrol',market_mood:'Bullish'},
-  {type:'fall',date:'2026-04-29',time:'07:33',company:'Wipro',confidence:'76',article_count:'2',neg_ratio:'100',reasoning:'2/2 articles negative · avg sentiment score -0.54',top_headline:'Wipro flags weak demand outlook; guidance disappoints Street',top_source:'LiveMint',market_mood:'Bullish'},
-  {type:'no_signal',date:'2026-04-28',time:'07:31',market_mood:'Bearish',articles_analysed:38,companies_found:9},
-  {type:'rise',date:'2026-04-27',time:'07:30',company:'TCS',confidence:'86',article_count:'3',pos_ratio:'100',reasoning:'3/3 articles positive · avg sentiment score +0.71',top_headline:'TCS wins $600M deal from Fortune 500 client in North America',top_source:'Reuters',market_mood:'Bullish'},
-  {type:'fall',date:'2026-04-27',time:'07:31',company:'Sun Pharma',confidence:'79',article_count:'2',neg_ratio:'100',reasoning:'2/2 articles negative · avg sentiment score -0.61',top_headline:'Sun Pharma receives US FDA warning letter for Halol plant',top_source:'Business Standard',market_mood:'Bullish'},
-  {type:'no_signal',date:'2026-04-26',time:'07:30',market_mood:'Neutral',articles_analysed:32,companies_found:7},
-  {type:'rise',date:'2026-04-25',time:'07:30',company:'Bajaj Finance',confidence:'81',article_count:'2',pos_ratio:'100',reasoning:'2/2 articles positive · avg sentiment score +0.55',top_headline:'Bajaj Finance Q4 net profit rises 21% YoY to Rs 4,200 Cr',top_source:'Moneycontrol',market_mood:'Bullish'},
-];
-
-load();
+      container.appendChild(div);
+    });
+  });
 </script>
+
 </body>
 </html>

@@ -1,83 +1,534 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI Stock Signals</title>
-
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AI Stock Intelligence — Signal Log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <style>
+/* ── RESET & BASE ───────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
 body {
   font-family: 'Inter', sans-serif;
-  background: #f8f6ff;
-  color: #2d2a3a;
-  padding: 40px 20px;
-  max-width: 800px;
-  margin: auto;
+  background: #0a0a0f;
+  color: #e2e8f0;
+  min-height: 100vh;
+  line-height: 1.6;
 }
 
-h1 {
+/* ── BACKGROUND GLOW ────────────────────────── */
+body::before {
+  content: '';
+  position: fixed;
+  top: -30vh; left: 50%;
+  transform: translateX(-50%);
+  width: 80vw; height: 60vh;
+  background: radial-gradient(ellipse, rgba(99,102,241,0.08) 0%, transparent 65%);
+  pointer-events: none; z-index: 0;
+}
+
+/* ── LAYOUT ─────────────────────────────────── */
+.page { position: relative; z-index: 1; max-width: 820px; margin: 0 auto; padding: 0 20px 80px; }
+
+/* ── HEADER ─────────────────────────────────── */
+.header {
+  padding: 56px 0 44px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  margin-bottom: 40px;
   text-align: center;
-  margin-bottom: 30px;
+}
+.header-badge {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 11px; font-weight: 500; letter-spacing: .1em;
+  text-transform: uppercase; color: #a5b4fc;
+  background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.25);
+  padding: 5px 14px; border-radius: 20px; margin-bottom: 22px;
+}
+.live-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #4ade80; animation: blink 2s infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+.header h1 {
+  font-size: clamp(28px, 5vw, 44px);
+  font-weight: 700; color: #f1f5f9;
+  line-height: 1.1; margin-bottom: 16px; letter-spacing: -.02em;
+}
+.header h1 span { color: #818cf8; }
+.header p {
+  font-size: 14px; color: #94a3b8; max-width: 540px;
+  margin: 0 auto 24px; line-height: 1.8;
+}
+.header-tags { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.tag {
+  font-size: 11px; font-weight: 500;
+  padding: 4px 12px; border-radius: 6px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: #94a3b8; text-decoration: none;
+  transition: all .2s;
+}
+.tag:hover { border-color: rgba(99,102,241,0.5); color: #c7d2fe; }
+.tag.main { background: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.3); color: #a5b4fc; }
+
+/* ── STATS GRID ─────────────────────────────── */
+.stats {
+  display: grid; grid-template-columns: repeat(5,1fr);
+  gap: 1px; background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px; overflow: hidden; margin-bottom: 32px;
+}
+.stat { background: #0f0f1a; padding: 20px 12px; text-align: center; }
+.stat-val {
+  font-size: 24px; font-weight: 700;
+  color: #f1f5f9; line-height: 1; margin-bottom: 5px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.stat-val.green { color: #4ade80; }
+.stat-val.red   { color: #f87171; }
+.stat-val.purple{ color: #a5b4fc; }
+.stat-lbl { font-size: 10px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: #475569; }
+
+/* ── FILTER BAR ─────────────────────────────── */
+.filter-bar {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 28px; flex-wrap: wrap;
+}
+.filter-lbl { font-size: 11px; font-weight: 500; color: #475569; text-transform: uppercase; letter-spacing: .06em; margin-right: 4px; }
+.f-btn {
+  font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 500;
+  padding: 6px 16px; border-radius: 8px; cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.03); color: #64748b;
+  transition: all .2s; letter-spacing: .02em;
+}
+.f-btn:hover { color: #e2e8f0; border-color: rgba(255,255,255,0.15); }
+.f-btn.a-all    { background: rgba(99,102,241,0.12); border-color: rgba(99,102,241,0.35); color: #a5b4fc; }
+.f-btn.a-rise   { background: rgba(74,222,128,0.10); border-color: rgba(74,222,128,0.30); color: #4ade80; }
+.f-btn.a-fall   { background: rgba(248,113,113,0.10); border-color: rgba(248,113,113,0.30); color: #f87171; }
+.f-btn.a-nosig  { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.12); color: #94a3b8; }
+
+/* ── SECTION LABEL ──────────────────────────── */
+.sec-lbl {
+  font-size: 10px; font-weight: 600; letter-spacing: .12em;
+  text-transform: uppercase; color: #334155;
+  margin-bottom: 14px; display: flex; align-items: center; gap: 12px;
+}
+.sec-lbl::after { content:''; flex:1; height:1px; background: rgba(255,255,255,0.05); }
+
+/* ── DATE GROUP ─────────────────────────────── */
+.date-group { margin-bottom: 36px; }
+.date-lbl {
+  font-size: 10px; font-weight: 600; letter-spacing: .1em;
+  text-transform: uppercase; color: #334155; margin-bottom: 12px;
 }
 
-.alert {
-  padding: 16px;
-  margin-bottom: 15px;
-  border-radius: 10px;
-  background: white;
-  border-left: 5px solid #ccc;
+/* ── CARD ───────────────────────────────────── */
+.card {
+  background: #0f0f1a;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 14px; margin-bottom: 12px;
+  overflow: hidden; animation: up .4s ease both;
+  transition: transform .2s, border-color .2s;
+}
+.card:hover { transform: translateY(-2px); }
+.card.rise { border-left: 3px solid #4ade80; }
+.card.rise:hover { border-color: rgba(74,222,128,0.3); }
+.card.fall { border-left: 3px solid #f87171; }
+.card.fall:hover { border-color: rgba(248,113,113,0.3); }
+.card.nosig { border-left: 3px solid #334155; }
+@keyframes up { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
+/* ── CARD HEADER ────────────────────────────── */
+.card-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px; border-bottom: 1px solid rgba(255,255,255,0.05); gap: 10px;
+}
+.card-label { display: flex; align-items: center; gap: 10px; }
+.card-icon {
+  width: 30px; height: 30px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center; font-size: 15px;
+}
+.card-icon.rise { background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.2); }
+.card-icon.fall { background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.2); }
+.card-icon.nosig{ background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); }
+.card-type { font-size: 12px; font-weight: 600; letter-spacing: .05em; }
+.card-type.rise { color: #4ade80; }
+.card-type.fall { color: #f87171; }
+.card-type.nosig{ color: #475569; }
+.card-time { font-size: 11px; color: #334155; font-family: 'JetBrains Mono', monospace; flex-shrink: 0; }
+
+/* ── CARD BODY ──────────────────────────────── */
+.card-body { padding: 18px 18px; }
+.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+.field {
+  padding: 10px 16px 10px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.field:nth-child(even) { padding-left: 16px; border-left: 1px solid rgba(255,255,255,0.04); }
+.field.full { grid-column: 1/-1; padding-left: 0; border-left: none; }
+.field.full:last-child { border-bottom: none; }
+.field-key {
+  font-size: 9px; font-weight: 600; letter-spacing: .1em;
+  text-transform: uppercase; color: #334155; margin-bottom: 4px;
+}
+.field-val { font-size: 13px; color: #cbd5e1; line-height: 1.5; }
+.field-val.green  { color: #4ade80; font-weight: 600; font-size: 15px; }
+.field-val.red    { color: #f87171; font-weight: 600; font-size: 15px; }
+.field-val.italic { color: #64748b; font-style: italic; font-size: 12px; }
+.field-val.mood-bull { color: #4ade80; }
+.field-val.mood-bear { color: #f87171; }
+
+/* confidence bar */
+.conf-bar { margin-top: 6px; height: 3px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; }
+.conf-fill { height: 100%; border-radius: 2px; transition: width 1s ease; }
+.conf-fill.green { background: linear-gradient(90deg, #22c55e, #4ade80); }
+.conf-fill.red   { background: linear-gradient(90deg, #dc2626, #f87171); }
+
+/* source */
+.field-src { font-size: 10px; color: #334155; margin-top: 4px; font-style: italic; }
+
+/* nosignal */
+.nosig-text { font-size: 13px; color: #475569; line-height: 1.8; }
+.mood-badge {
+  display: inline-block; font-size: 10px; font-weight: 500;
+  padding: 2px 10px; border-radius: 4px; margin-left: 8px; vertical-align: middle;
 }
 
-.rise { border-color: #4ade80; }
-.fall { border-color: #f87171; }
-.neutral { border-color: #facc15; }
+/* ── EMPTY / LOADING ────────────────────────── */
+#loading {
+  text-align: center; padding: 70px 0;
+  font-size: 12px; color: #334155; letter-spacing: .08em; font-weight: 500;
+}
+.spin {
+  width: 22px; height: 22px;
+  border: 2px solid rgba(255,255,255,0.06); border-top-color: #818cf8;
+  border-radius: 50%; animation: spin .7s linear infinite; margin: 0 auto 16px;
+}
+@keyframes spin { to{ transform: rotate(360deg); } }
+#empty { text-align: center; padding: 70px 0; color: #334155; }
+#empty p { font-size: 13px; color: #475569; margin-top: 10px; }
 
-.small {
-  font-size: 12px;
-  color: #666;
+/* ── FOOTER ─────────────────────────────────── */
+footer {
+  border-top: 1px solid rgba(255,255,255,0.06);
+  padding-top: 28px; margin-top: 48px;
+  display: flex; justify-content: space-between;
+  align-items: center; flex-wrap: wrap; gap: 12px;
+}
+.footer-left { font-size: 12px; color: #334155; line-height: 1.8; }
+.footer-links { display: flex; gap: 20px; }
+.footer-links a {
+  font-size: 11px; font-weight: 500; letter-spacing: .06em;
+  text-transform: uppercase; color: #334155;
+  text-decoration: none; transition: color .2s;
+}
+.footer-links a:hover { color: #818cf8; }
+
+/* ── RESPONSIVE ─────────────────────────────── */
+@media (max-width: 600px) {
+  .stats { grid-template-columns: repeat(3,1fr); }
+  .fields { grid-template-columns: 1fr; }
+  .field:nth-child(even) { padding-left: 0; border-left: none; }
+  .field.full { grid-column: auto; }
 }
 </style>
 </head>
-
 <body>
+<div class="page">
 
-<h1>📊 AI Stock Alerts</h1>
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-badge"><span class="live-dot"></span>Live Signal Log · NSE India</div>
+    <h1>AI Stock <span>Rise & Fall</span><br>Predictions</h1>
+    <p>
+      Every morning at <strong style="color:#e2e8f0">7:30 AM IST</strong>,
+      this system fetches Indian financial news, runs
+      <strong style="color:#e2e8f0">FinBERT</strong> sentiment analysis,
+      detects any company in the news, and predicts
+      <strong style="color:#4ade80">RISE ▲</strong> or <strong style="color:#f87171">FALL ▼</strong>.
+      Every Telegram alert is logged here — publicly.
+    </p>
+    <div class="header-tags">
+      <span class="tag main">● FinBERT · ProsusAI</span>
+      <span class="tag">NewsAPI</span>
+      <span class="tag">spaCy NER</span>
+      <span class="tag">GitHub Actions</span>
+      <span class="tag">Telegram Bot</span>
+      <a class="tag" href="https://github.com/sumukh964/AI_stock_notifier" target="_blank">↗ GitHub Repo</a>
+    </div>
+  </div>
 
-<div id="alerts">Loading...</div>
+  <!-- STATS -->
+  <div class="stats">
+    <div class="stat"><div class="stat-val purple" id="s-total">—</div><div class="stat-lbl">Total Runs</div></div>
+    <div class="stat"><div class="stat-val green"  id="s-rise">—</div><div class="stat-lbl">RISE Signals</div></div>
+    <div class="stat"><div class="stat-val red"    id="s-fall">—</div><div class="stat-lbl">FALL Signals</div></div>
+    <div class="stat"><div class="stat-val"        id="s-nosig">—</div><div class="stat-lbl">No Signal Days</div></div>
+    <div class="stat"><div class="stat-val purple" id="s-conf">—</div><div class="stat-lbl">Avg Confidence</div></div>
+  </div>
+
+  <!-- FILTERS -->
+  <div class="filter-bar">
+    <span class="filter-lbl">Show</span>
+    <button class="f-btn a-all"  onclick="applyFilter('all',this)">All</button>
+    <button class="f-btn"        onclick="applyFilter('rise',this)">RISE ▲</button>
+    <button class="f-btn"        onclick="applyFilter('fall',this)">FALL ▼</button>
+    <button class="f-btn"        onclick="applyFilter('buy',this)">BUY</button>
+    <button class="f-btn"        onclick="applyFilter('no_signal',this)">No Signal</button>
+  </div>
+
+  <!-- FEED -->
+  <div class="sec-lbl">Signal history</div>
+  <div id="loading"><div class="spin"></div>LOADING SIGNALS…</div>
+  <div id="feed"></div>
+  <div id="empty" style="display:none"><div style="font-size:36px;opacity:.2">◎</div><p>No signals match this filter.</p></div>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-left">
+      Built by <strong style="color:#cbd5e1">Sumukh R</strong> · Final Year Project 2026<br>
+      <span style="font-size:11px">Not financial advice. For educational & portfolio purposes only.</span>
+    </div>
+    <div class="footer-links">
+      <a href="https://github.com/sumukh964/AI_stock_notifier" target="_blank">GitHub</a>
+      <a href="https://github.com/sumukh964/AI_stock_notifier/actions" target="_blank">Actions</a>
+    </div>
+  </footer>
+</div>
 
 <script>
-fetch("alerts.json")
-  .then(res => res.json())
-  .then(data => {
-    const container = document.getElementById("alerts");
-    container.innerHTML = "";
+/* ── STATE ──────────────────────────────────────────────────────── */
+let ALL = [], FILTER = 'all';
 
-    if (!data.length) {
-      container.innerHTML = "No alerts available";
-      return;
-    }
+/* ── LOAD ───────────────────────────────────────────────────────── */
+async function load() {
+  try {
+    const r = await fetch('alerts.json?v=' + Date.now());
+    if (!r.ok) throw new Error();
+    ALL = await r.json();
+  } catch {
+    ALL = SAMPLE;
+  }
+  document.getElementById('loading').style.display = 'none';
+  calcStats();
+  renderFeed();
+}
 
-    data.forEach(a => {
-      let cls = "neutral";
-      if (a.prediction === "RISE") cls = "rise";
-      if (a.prediction === "FALL") cls = "fall";
+/* ── STATS ──────────────────────────────────────────────────────── */
+function calcStats() {
+  const rise  = ALL.filter(a => a.type === 'rise' || a.type === 'buy');
+  const fall  = ALL.filter(a => a.type === 'fall');
+  const confs = [...rise, ...fall].map(a => parseFloat(a.confidence)).filter(Boolean);
+  const avg   = confs.length ? Math.round(confs.reduce((s,v)=>s+v,0)/confs.length) : 0;
+  set('s-total', ALL.length);
+  set('s-rise',  rise.length);
+  set('s-fall',  fall.length);
+  set('s-nosig', ALL.filter(a => a.type === 'no_signal').length);
+  set('s-conf',  avg ? avg + '%' : '—');
+}
+function set(id, v) { document.getElementById(id).textContent = v; }
 
-      const div = document.createElement("div");
-      div.className = "alert " + cls;
+/* ── FILTER ─────────────────────────────────────────────────────── */
+function applyFilter(f, el) {
+  FILTER = f;
+  document.querySelectorAll('.f-btn').forEach(b => b.className = 'f-btn');
+  const cls = f==='rise'?'a-rise':f==='fall'?'a-fall':f==='no_signal'?'a-nosig':'a-all';
+  el.className = 'f-btn ' + cls;
+  renderFeed();
+}
 
-      div.innerHTML = `
-        <b>${a.company}</b><br>
-        ${a.prediction} (${a.confidence}%)<br>
-        ${a.reason}<br>
-        <span class="small">${a.time}</span>
-      `;
-
-      container.appendChild(div);
-    });
+/* ── RENDER ─────────────────────────────────────────────────────── */
+function renderFeed() {
+  // treat 'buy' and 'rise' the same for filtering
+  const list = ALL.filter(a => {
+    if (FILTER === 'all') return true;
+    if (FILTER === 'rise') return a.type === 'rise' || a.type === 'buy';
+    return a.type === FILTER;
   });
-</script>
 
+  const feed  = document.getElementById('feed');
+  const empty = document.getElementById('empty');
+  if (!list.length) { feed.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+
+  // Group by date, newest first
+  const groups = {};
+  list.forEach(a => {
+    const d = a.date || 'Unknown';
+    if (!groups[d]) groups[d] = [];
+    groups[d].push(a);
+  });
+  const dates = Object.keys(groups).sort((a,b) => new Date(b)-new Date(a));
+
+  let idx = 0;
+  feed.innerHTML = dates.map(date => `
+    <div class="date-group">
+      <div class="date-lbl">${fmtDate(date)}</div>
+      ${groups[date].map(a => buildCard(a, idx++)).join('')}
+    </div>`).join('');
+}
+
+/* ── CARD BUILDER ───────────────────────────────────────────────── */
+function buildCard(a, i) {
+  const delay = Math.min(i * 55, 450) + 'ms';
+
+  /* ── RISE / BUY ── */
+  if (a.type === 'rise' || a.type === 'buy') {
+    const c = parseFloat(a.confidence) || 0;
+    // support both field names: top_reason (buy) and top_headline (rise)
+    const headline = a.top_reason || a.top_headline || '—';
+    const count    = a.news_count || a.article_count || '—';
+    const posCount = a.positive_count || a.pos_ratio || '—';
+    const countLbl = a.news_count
+      ? `${count} headline(s) (${posCount} positive)`
+      : `${count} articles (${posCount}% positive)`;
+    const moodCls  = a.market_mood==='Bullish'?'mood-bull':a.market_mood==='Bearish'?'mood-bear':'';
+
+    return `
+    <div class="card rise" style="animation-delay:${delay}">
+      <div class="card-hdr">
+        <div class="card-label">
+          <div class="card-icon rise">📈</div>
+          <span class="card-type rise">${a.type==='buy'?'AI STOCK BUY SIGNAL':'STOCK RISE PREDICTION ▲'}</span>
+        </div>
+        <span class="card-time">${a.time || ''} IST</span>
+      </div>
+      <div class="card-body">
+        <div class="fields">
+          <div class="field">
+            <div class="field-key">🏢 Company</div>
+            <div class="field-val green">${a.company || '—'}</div>
+          </div>
+          <div class="field">
+            <div class="field-key">📊 Confidence</div>
+            <div class="field-val green">${c}%</div>
+            <div class="conf-bar"><div class="conf-fill green" style="width:${c}%"></div></div>
+          </div>
+          <div class="field">
+            <div class="field-key">📰 News Count</div>
+            <div class="field-val">${countLbl}</div>
+          </div>
+          <div class="field">
+            <div class="field-key">🌐 Market Mood</div>
+            <div class="field-val ${moodCls}">${a.market_mood || '—'}</div>
+          </div>
+          ${a.reasoning ? `
+          <div class="field full">
+            <div class="field-key">🧠 Reasoning</div>
+            <div class="field-val" style="color:#64748b">${a.reasoning}</div>
+          </div>` : ''}
+          <div class="field full">
+            <div class="field-key">💡 Top Headline</div>
+            <div class="field-val italic">"${headline}"</div>
+            ${a.top_source ? `<div class="field-src">— ${a.top_source}</div>` : ''}
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  /* ── FALL ── */
+  if (a.type === 'fall') {
+    const c       = parseFloat(a.confidence) || 0;
+    const headline= a.top_headline || a.top_reason || '—';
+    const count   = a.article_count || a.news_count || '—';
+    const negPct  = a.neg_ratio || a.negative_count || '—';
+    const moodCls = a.market_mood==='Bullish'?'mood-bull':a.market_mood==='Bearish'?'mood-bear':'';
+
+    return `
+    <div class="card fall" style="animation-delay:${delay}">
+      <div class="card-hdr">
+        <div class="card-label">
+          <div class="card-icon fall">📉</div>
+          <span class="card-type fall">STOCK FALL PREDICTION ▼</span>
+        </div>
+        <span class="card-time">${a.time || ''} IST</span>
+      </div>
+      <div class="card-body">
+        <div class="fields">
+          <div class="field">
+            <div class="field-key">🏢 Company</div>
+            <div class="field-val red">${a.company || '—'}</div>
+          </div>
+          <div class="field">
+            <div class="field-key">📊 Confidence</div>
+            <div class="field-val red">${c}%</div>
+            <div class="conf-bar"><div class="conf-fill red" style="width:${c}%"></div></div>
+          </div>
+          <div class="field">
+            <div class="field-key">📰 Articles</div>
+            <div class="field-val">${count} analysed (${negPct}% negative)</div>
+          </div>
+          <div class="field">
+            <div class="field-key">🌐 Market Mood</div>
+            <div class="field-val ${moodCls}">${a.market_mood || '—'}</div>
+          </div>
+          ${a.reasoning ? `
+          <div class="field full">
+            <div class="field-key">🧠 Reasoning</div>
+            <div class="field-val" style="color:#64748b">${a.reasoning}</div>
+          </div>` : ''}
+          <div class="field full">
+            <div class="field-key">💡 Top Headline</div>
+            <div class="field-val italic">"${headline}"</div>
+            ${a.top_source ? `<div class="field-src">— ${a.top_source}</div>` : ''}
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  /* ── NO SIGNAL ── */
+  if (a.type === 'no_signal') {
+    const mc = a.market_mood==='Bearish'?'#f87171':a.market_mood==='Bullish'?'#4ade80':'#64748b';
+    const extra = a.articles_analysed
+      ? `${a.articles_analysed} articles analysed · ${a.companies_found} companies found.`
+      : '';
+    return `
+    <div class="card nosig" style="animation-delay:${delay}">
+      <div class="card-hdr">
+        <div class="card-label">
+          <div class="card-icon nosig">🔕</div>
+          <span class="card-type nosig">NO STRONG SIGNALS</span>
+        </div>
+        <span class="card-time">${a.time || ''} IST</span>
+      </div>
+      <div class="card-body">
+        <p class="nosig-text">
+          No high-confidence RISE or FALL predictions today. ${extra}
+          Market sentiment cautious.
+          <span class="mood-badge" style="background:${mc}18;color:${mc};border:1px solid ${mc}40">
+            ${a.market_mood || 'Neutral'}
+          </span>
+        </p>
+      </div>
+    </div>`;
+  }
+
+  return '';
+}
+
+/* ── HELPERS ────────────────────────────────────────────────────── */
+function fmtDate(d) {
+  try { return new Date(d).toLocaleDateString('en-IN',{weekday:'long',year:'numeric',month:'long',day:'numeric'}); }
+  catch { return d; }
+}
+
+/* ── SAMPLE DATA (shown until real alerts.json is generated) ─────── */
+const SAMPLE = [
+  {type:'buy',date:'2026-04-30',time:'07:31',company:'ITC',confidence:'95',news_count:'1',positive_count:'1',top_reason:'ITC, Godfrey Phillips shares rise up to 6.5% on report of 17% hike in cigarette prices in May',market_mood:'Neutral'},
+  {type:'rise',date:'2026-04-29',time:'07:31',company:'Reliance Industries',confidence:'89',article_count:'4',pos_ratio:'80',reasoning:'4/4 articles positive · avg sentiment score +0.62',top_headline:'Reliance posts record Q4 profit on Jio growth and retail expansion',top_source:'Economic Times',market_mood:'Bullish'},
+  {type:'rise',date:'2026-04-29',time:'07:32',company:'HDFC Bank',confidence:'83',article_count:'3',pos_ratio:'100',reasoning:'3/3 articles positive · avg sentiment score +0.58',top_headline:'HDFC Bank sees surge in retail loan disbursals in March quarter',top_source:'Moneycontrol',market_mood:'Bullish'},
+  {type:'fall',date:'2026-04-29',time:'07:33',company:'Wipro',confidence:'76',article_count:'2',neg_ratio:'100',reasoning:'2/2 articles negative · avg sentiment score -0.54',top_headline:'Wipro flags weak demand outlook; guidance disappoints Street',top_source:'LiveMint',market_mood:'Bullish'},
+  {type:'no_signal',date:'2026-04-28',time:'07:31',market_mood:'Bearish',articles_analysed:38,companies_found:9},
+  {type:'rise',date:'2026-04-27',time:'07:30',company:'TCS',confidence:'86',article_count:'3',pos_ratio:'100',reasoning:'3/3 articles positive · avg sentiment score +0.71',top_headline:'TCS wins $600M deal from Fortune 500 client in North America',top_source:'Reuters',market_mood:'Bullish'},
+  {type:'fall',date:'2026-04-27',time:'07:31',company:'Sun Pharma',confidence:'79',article_count:'2',neg_ratio:'100',reasoning:'2/2 articles negative · avg sentiment score -0.61',top_headline:'Sun Pharma receives US FDA warning letter for Halol plant',top_source:'Business Standard',market_mood:'Bullish'},
+];
+
+load();
+</script>
 </body>
 </html>

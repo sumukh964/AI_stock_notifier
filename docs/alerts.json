@@ -1,6 +1,14 @@
 [
   {
     "type": "no_signal",
+    "date": "2026-05-11",
+    "time": "06:01",
+    "market_mood": "Neutral",
+    "articles_analysed": 20,
+    "companies_found": 52
+  },
+  {
+    "type": "no_signal",
     "date": "2026-05-10",
     "time": "05:39",
     "market_mood": "Neutral",

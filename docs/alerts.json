@@ -1,1 +1,13 @@
-[]
+[
+  {
+    "type": "buy",
+    "date": "2026-05-13",
+    "time": "07:30",
+    "company": "Reliance",
+    "confidence": "91",
+    "news_count": "3",
+    "positive_count": "3",
+    "top_reason": "Strong earnings growth",
+    "market_mood": "Bullish"
+  }
+]

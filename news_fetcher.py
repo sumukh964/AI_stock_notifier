@@ -6,7 +6,7 @@ import logging
 import requests
 from bs4 import BeautifulSoup
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 import torch
@@ -26,18 +26,27 @@ log = logging.getLogger(__name__)
 
 
 # ─────────────────────────────────────────────
-# CONFIG
+# CONFIG — TUNED THRESHOLDS
 # ─────────────────────────────────────────────
 NEWS_API_KEY  = os.getenv("NEWS_API_KEY")
 BOT_TOKEN     = os.getenv("BOT_TOKEN")
 CHAT_ID       = os.getenv("CHAT_ID")
 ALERTS_LOG    = Path("docs/alerts.json")
 
-MAX_ARTICLES             = 60
-MIN_ARTICLES_FOR_SIGNAL  = 2
-BUY_CONFIDENCE_THRESHOLD = 0.75
-SEL_CONFIDENCE_THRESHOLD = 0.75
-BEARISH_MARKET_RATIO     = 0.50
+MAX_ARTICLES   = 60
+MAX_SIGNALS    = 5          # max alerts per run to avoid spam
+
+# Single article thresholds
+SINGLE_RISE_CONF  = 0.80    # 1 article: needs very high confidence to signal RISE
+SINGLE_FALL_CONF  = 0.80    # 1 article: needs very high confidence to signal FALL
+
+# Multi article thresholds (2+ articles) — more relaxed
+MULTI_RISE_CONF   = 0.65    # avg positive score across articles
+MULTI_FALL_CONF   = 0.65    # avg negative score across articles
+MULTI_RISE_RATIO  = 0.55    # at least 55% of articles must be positive
+MULTI_FALL_RATIO  = 0.55    # at least 55% of articles must be negative
+
+BEARISH_SUPPRESS  = 0.60    # >60% negative headlines → suppress RISE signals
 
 HEADERS = {
     "User-Agent": (
@@ -56,29 +65,29 @@ NOISE_WORDS = {
     "bloomberg", "press", "trust", "bharat", "corp", "corporation",
     "markets", "exchange", "board", "authority", "committee", "fund",
     "quarter", "fiscal", "year", "rate", "policy", "inflation",
+    "stock", "share", "shares", "equity", "index", "indices",
 }
 
-# ── Web scraping sources ──────────────────────
 SCRAPE_SOURCES = [
     {
-        "name": "Economic Times Markets",
+        "name": "Economic Times",
         "url":  "https://economictimes.indiatimes.com/markets/stocks/news",
-        "tag":  "a",   "class_": "eachStory",  "headline_tag": "h3",
+        "tag":  "a",   "class_": "eachStory",       "headline_tag": "h3",
     },
     {
-        "name": "Moneycontrol Markets",
+        "name": "Moneycontrol",
         "url":  "https://www.moneycontrol.com/news/business/markets/",
-        "tag":  "li",  "class_": "clearfix",   "headline_tag": "h2",
+        "tag":  "li",  "class_": "clearfix",        "headline_tag": "h2",
     },
     {
-        "name": "LiveMint Markets",
+        "name": "LiveMint",
         "url":  "https://www.livemint.com/market/stock-market-news",
-        "tag":  "div", "class_": "listingNew", "headline_tag": "h2",
+        "tag":  "div", "class_": "listingNew",      "headline_tag": "h2",
     },
     {
-        "name": "Business Standard Markets",
+        "name": "Business Standard",
         "url":  "https://www.business-standard.com/markets",
-        "tag":  "h2",  "class_": "headline",   "headline_tag": None,
+        "tag":  "h2",  "class_": "headline",        "headline_tag": None,
     },
     {
         "name": "NDTV Profit",
@@ -89,10 +98,9 @@ SCRAPE_SOURCES = [
 
 
 # ─────────────────────────────────────────────
-# A. NEWS COLLECTION — SCRAPING (PRIMARY)
+# A. SCRAPING (PRIMARY)
 # ─────────────────────────────────────────────
 def scrape_headlines() -> list[dict]:
-    """Scrape headlines from multiple Indian financial news sites."""
     articles: list[dict] = []
     seen:     set[str]   = set()
 
@@ -101,117 +109,93 @@ def scrape_headlines() -> list[dict]:
             resp = requests.get(src["url"], headers=HEADERS, timeout=12)
             resp.raise_for_status()
             soup = BeautifulSoup(resp.text, "html.parser")
-
             containers = soup.find_all(src["tag"], class_=src["class_"])
+            count = 0
             for container in containers:
-                # Get headline text
                 if src["headline_tag"]:
-                    tag = container.find(src["headline_tag"])
+                    tag  = container.find(src["headline_tag"])
                     text = tag.get_text(strip=True) if tag else ""
                 else:
                     text = container.get_text(strip=True)
 
-                if not text or text in seen or len(text) < 20:
+                text = text.strip()
+                if not text or text in seen or len(text) < 25:
                     continue
 
                 seen.add(text)
                 articles.append({
-                    "title":      text,
-                    "full_text":  text,
-                    "source":     src["name"],
-                    "url":        src["url"],
+                    "title":     text,
+                    "full_text": text,
+                    "source":    src["name"],
                 })
+                count += 1
 
-            log.info(f"✅ Scraped: {src['name']} → {len(containers)} items")
+            log.info(f"✅ {src['name']} → {count} headlines")
 
         except requests.exceptions.Timeout:
             log.warning(f"⏱ Timeout: {src['name']}")
         except Exception as exc:
-            log.warning(f"⚠ Scrape error {src['name']}: {exc}")
+            log.warning(f"⚠ {src['name']}: {exc}")
 
-    log.info(f"📰 Scraped total: {len(articles)} headlines")
+    log.info(f"📰 Scraped: {len(articles)} total headlines")
     return articles
 
 
 # ─────────────────────────────────────────────
-# B. NEWS COLLECTION — NEWSAPI (BONUS)
+# B. NEWSAPI (BONUS — free tier endpoint)
 # ─────────────────────────────────────────────
 def fetch_newsapi() -> list[dict]:
-    """Fetch from NewsAPI free tier using top-headlines endpoint."""
     if not NEWS_API_KEY:
-        log.info("ℹ NewsAPI key not set — skipping")
         return []
 
     articles: list[dict] = []
     seen:     set[str]   = set()
 
-    # top-headlines works on free tier
-    endpoints = [
-        {
-            "url": "https://newsapi.org/v2/top-headlines",
-            "params": {
+    try:
+        resp = requests.get(
+            "https://newsapi.org/v2/top-headlines",
+            params={
                 "country":  "in",
                 "category": "business",
                 "pageSize": 30,
                 "apiKey":   NEWS_API_KEY,
-            }
-        },
-        {
-            "url": "https://newsapi.org/v2/everything",
-            "params": {
-                "q":        "India stock NSE BSE earnings",
-                "language": "en",
-                "pageSize": 20,
-                "sortBy":   "publishedAt",
-                "apiKey":   NEWS_API_KEY,
-            }
-        }
-    ]
+            },
+            timeout=12,
+        )
+        resp.raise_for_status()
+        data = resp.json()
 
-    for ep in endpoints:
-        try:
-            resp = requests.get(ep["url"], params=ep["params"], timeout=12)
-            resp.raise_for_status()
-            data = resp.json()
-
-            if data.get("status") != "ok":
-                log.warning(f"NewsAPI status: {data.get('message','unknown error')}")
-                continue
-
+        if data.get("status") == "ok":
             for art in data.get("articles", []):
                 title = (art.get("title") or "").strip()
                 desc  = (art.get("description") or "").strip()
-
                 if not title or title in seen or "[Removed]" in title:
                     continue
-
                 seen.add(title)
                 articles.append({
                     "title":     title,
                     "full_text": f"{title}. {desc}".strip(),
                     "source":    art.get("source", {}).get("name", "NewsAPI"),
-                    "url":       art.get("url", ""),
                 })
+            log.info(f"✅ NewsAPI → {len(articles)} articles")
+        else:
+            log.warning(f"NewsAPI: {data.get('message','error')}")
 
-            log.info(f"✅ NewsAPI → {len(data.get('articles',[]))} articles")
-
-        except Exception as exc:
-            log.warning(f"⚠ NewsAPI error: {exc}")
+    except Exception as exc:
+        log.warning(f"⚠ NewsAPI: {exc}")
 
     return articles
 
 
 # ─────────────────────────────────────────────
-# C. MERGE ALL SOURCES
+# C. MERGE ALL
 # ─────────────────────────────────────────────
-def collect_all_news() -> list[dict]:
-    """Combine scraping + NewsAPI, deduplicate, cap at MAX_ARTICLES."""
+def collect_news() -> list[dict]:
     scraped  = scrape_headlines()
     api_news = fetch_newsapi()
 
-    # Merge — scraping first, then API extras
-    seen:    set[str]   = set()
-    merged:  list[dict] = []
+    seen:   set[str]   = set()
+    merged: list[dict] = []
 
     for art in scraped + api_news:
         key = art["title"].lower().strip()[:80]
@@ -220,12 +204,12 @@ def collect_all_news() -> list[dict]:
             merged.append(art)
 
     final = merged[:MAX_ARTICLES]
-    log.info(f"📦 Total merged articles: {len(final)} (scrape={len(scraped)}, api={len(api_news)})")
+    log.info(f"📦 Final pool: {len(final)} articles")
     return final
 
 
 # ─────────────────────────────────────────────
-# D. FINBERT SENTIMENT ENGINE
+# D. FINBERT ENGINE
 # ─────────────────────────────────────────────
 class SentimentEngine:
     MODEL_NAME = "ProsusAI/finbert"
@@ -260,7 +244,7 @@ class SentimentEngine:
 
 
 # ─────────────────────────────────────────────
-# E. DYNAMIC COMPANY EXTRACTION
+# E. COMPANY EXTRACTION
 # ─────────────────────────────────────────────
 def load_nlp() -> spacy.Language:
     try:
@@ -274,13 +258,12 @@ def load_nlp() -> spacy.Language:
 
 def is_valid_company(name: str) -> bool:
     clean = name.strip().lower()
-    if len(clean) < 3:                          return False
-    if clean in NOISE_WORDS:                    return False
-    if re.fullmatch(r"[\d\s\W]+", clean):       return False
-    if any(w in clean for w in [
-        "government", "ministry", "court",
-        "reserve bank", "prime minister",
-    ]):                                          return False
+    if len(clean) < 3:                    return False
+    if clean in NOISE_WORDS:              return False
+    if re.fullmatch(r"[\d\s\W]+", clean): return False
+    for noise in ["government", "ministry", "court", "reserve bank",
+                  "prime minister", "lok sabha", "rajya sabha"]:
+        if noise in clean:                return False
     return True
 
 
@@ -302,43 +285,67 @@ def extract_companies(text: str, nlp: spacy.Language) -> list[str]:
 
 
 # ─────────────────────────────────────────────
-# F. RISE / FALL PREDICTION
+# F. PREDICTION ENGINE — RELAXED THRESHOLDS
 # ─────────────────────────────────────────────
 def predict(records: list[dict]) -> dict:
     total     = len(records)
     positives = [r for r in records if r["sentiment"] == "positive"]
     negatives = [r for r in records if r["sentiment"] == "negative"]
+    pos_ratio = len(positives) / total
+    neg_ratio = len(negatives) / total
+    pos_avg   = sum(r["positive_score"] for r in records) / total
+    neg_avg   = sum(r["negative_score"] for r in records) / total
+    weighted  = sum(r["positive_score"] - r["negative_score"] for r in records) / total
 
-    avg_weighted = sum(r["positive_score"] - r["negative_score"] for r in records) / total
-    pos_avg      = sum(r["positive_score"] for r in records) / total
-    neg_avg      = sum(r["negative_score"] for r in records) / total
-    pos_ratio    = len(positives) / total
-    neg_ratio    = len(negatives) / total
-
-    if avg_weighted > 0.15 and pos_ratio >= 0.6 and pos_avg >= BUY_CONFIDENCE_THRESHOLD:
+    # ── Single article: needs high confidence ──────────────────────
+    if total == 1:
+        r = records[0]
+        if r["sentiment"] == "positive" and r["positive_score"] >= SINGLE_RISE_CONF:
+            return {
+                "prediction":    "RISE",
+                "confidence":    round(r["positive_score"], 4),
+                "reasoning":     f"Strong positive signal · confidence {round(r['positive_score']*100)}%",
+                "pos_ratio":     1.0, "neg_ratio": 0.0, "article_count": 1,
+            }
+        if r["sentiment"] == "negative" and r["negative_score"] >= SINGLE_FALL_CONF:
+            return {
+                "prediction":    "FALL",
+                "confidence":    round(r["negative_score"], 4),
+                "reasoning":     f"Strong negative signal · confidence {round(r['negative_score']*100)}%",
+                "pos_ratio":     0.0, "neg_ratio": 1.0, "article_count": 1,
+            }
         return {
-            "prediction":  "RISE",
-            "confidence":  round(pos_avg, 4),
-            "reasoning":   f"{len(positives)}/{total} articles positive · score +{avg_weighted:.2f}",
-            "pos_ratio":   round(pos_ratio, 2),
-            "neg_ratio":   round(neg_ratio, 2),
+            "prediction": "NEUTRAL", "confidence": round(max(pos_avg, neg_avg), 4),
+            "reasoning": f"Single article below threshold",
+            "pos_ratio": pos_ratio, "neg_ratio": neg_ratio, "article_count": total,
+        }
+
+    # ── Multiple articles: relaxed thresholds ──────────────────────
+    if pos_ratio >= MULTI_RISE_RATIO and pos_avg >= MULTI_RISE_CONF and weighted > 0.10:
+        return {
+            "prediction":    "RISE",
+            "confidence":    round(pos_avg, 4),
+            "reasoning":     f"{len(positives)}/{total} positive · avg score +{weighted:.2f}",
+            "pos_ratio":     round(pos_ratio, 2),
+            "neg_ratio":     round(neg_ratio, 2),
             "article_count": total,
         }
-    if avg_weighted < -0.15 and neg_ratio >= 0.6 and neg_avg >= SEL_CONFIDENCE_THRESHOLD:
+    if neg_ratio >= MULTI_FALL_RATIO and neg_avg >= MULTI_FALL_CONF and weighted < -0.10:
         return {
-            "prediction":  "FALL",
-            "confidence":  round(neg_avg, 4),
-            "reasoning":   f"{len(negatives)}/{total} articles negative · score {avg_weighted:.2f}",
-            "pos_ratio":   round(pos_ratio, 2),
-            "neg_ratio":   round(neg_ratio, 2),
+            "prediction":    "FALL",
+            "confidence":    round(neg_avg, 4),
+            "reasoning":     f"{len(negatives)}/{total} negative · avg score {weighted:.2f}",
+            "pos_ratio":     round(pos_ratio, 2),
+            "neg_ratio":     round(neg_ratio, 2),
             "article_count": total,
         }
+
     return {
-        "prediction":  "NEUTRAL",
-        "confidence":  round(max(pos_avg, neg_avg), 4),
-        "reasoning":   f"Mixed: {len(positives)} pos / {len(negatives)} neg / {total - len(positives) - len(negatives)} neu",
-        "pos_ratio":   round(pos_ratio, 2),
-        "neg_ratio":   round(neg_ratio, 2),
+        "prediction":    "NEUTRAL",
+        "confidence":    round(max(pos_avg, neg_avg), 4),
+        "reasoning":     f"Mixed: {len(positives)} pos / {len(negatives)} neg / {total - len(positives) - len(negatives)} neu",
+        "pos_ratio":     round(pos_ratio, 2),
+        "neg_ratio":     round(neg_ratio, 2),
         "article_count": total,
     }
 
@@ -348,16 +355,16 @@ def predict(records: list[dict]) -> dict:
 # ─────────────────────────────────────────────
 def market_mood(results: list[dict]) -> str:
     if not results: return "Neutral"
-    neg = sum(1 for r in results if r["sentiment"] == "negative")
-    pos = sum(1 for r in results if r["sentiment"] == "positive")
     n   = len(results)
-    if neg / n > BEARISH_MARKET_RATIO:  return "Bearish"
-    if pos / n > BEARISH_MARKET_RATIO:  return "Bullish"
+    neg = sum(1 for r in results if r["sentiment"] == "negative") / n
+    pos = sum(1 for r in results if r["sentiment"] == "positive") / n
+    if neg > BEARISH_SUPPRESS:  return "Bearish"
+    if pos > 0.55:              return "Bullish"
     return "Neutral"
 
 
 # ─────────────────────────────────────────────
-# H. SAVE TO docs/alerts.json
+# H. SAVE ALERT
 # ─────────────────────────────────────────────
 def save_alert(data: dict) -> None:
     try:
@@ -369,7 +376,7 @@ def save_alert(data: dict) -> None:
         alerts.insert(0, data)
         with open(ALERTS_LOG, "w") as f:
             json.dump(alerts, f, indent=2)
-        log.info(f"💾 Saved alert → {ALERTS_LOG}")
+        log.info(f"💾 Saved → {ALERTS_LOG}")
     except Exception as exc:
         log.error(f"Save failed: {exc}")
 
@@ -396,14 +403,14 @@ def send_telegram(msg: str) -> None:
 def rise_msg(company, pred, headline, source, mood) -> str:
     c   = round(pred["confidence"] * 100)
     bar = "█" * (c // 10) + "░" * (10 - c // 10)
+    arts = pred["article_count"]
     return (
         f"📈 <b>AI STOCK BUY SIGNAL</b>\n\n"
         f"🏢 <b>Company:</b> {company}\n"
         f"🔮 <b>Prediction:</b> RISE ▲\n"
         f"📊 <b>Confidence:</b> {c}%\n"
         f"     <code>{bar}</code>\n"
-        f"📰 <b>Articles:</b> {pred['article_count']} "
-        f"({round(pred['pos_ratio']*100)}% positive)\n"
+        f"📰 <b>Articles:</b> {arts} ({round(pred['pos_ratio']*100)}% positive)\n"
         f"🧠 <b>Reasoning:</b> {pred['reasoning']}\n"
         f"💡 <b>Top Headline:</b> {headline}\n"
         f"📡 <b>Source:</b> {source}\n"
@@ -415,14 +422,14 @@ def rise_msg(company, pred, headline, source, mood) -> str:
 def fall_msg(company, pred, headline, source, mood) -> str:
     c   = round(pred["confidence"] * 100)
     bar = "█" * (c // 10) + "░" * (10 - c // 10)
+    arts = pred["article_count"]
     return (
         f"📉 <b>AI STOCK FALL SIGNAL</b>\n\n"
         f"🏢 <b>Company:</b> {company}\n"
         f"🔮 <b>Prediction:</b> FALL ▼\n"
         f"📊 <b>Confidence:</b> {c}%\n"
         f"     <code>{bar}</code>\n"
-        f"📰 <b>Articles:</b> {pred['article_count']} "
-        f"({round(pred['neg_ratio']*100)}% negative)\n"
+        f"📰 <b>Articles:</b> {arts} ({round(pred['neg_ratio']*100)}% negative)\n"
         f"🧠 <b>Reasoning:</b> {pred['reasoning']}\n"
         f"💡 <b>Top Headline:</b> {headline}\n"
         f"📡 <b>Source:</b> {source}\n"
@@ -432,40 +439,28 @@ def fall_msg(company, pred, headline, source, mood) -> str:
 
 
 # ─────────────────────────────────────────────
-# MAIN PIPELINE
+# MAIN
 # ─────────────────────────────────────────────
 def main() -> None:
     start = time.time()
     now   = datetime.now()
 
     log.info("=" * 65)
-    log.info("  AI STOCK INTELLIGENCE v3 — SCRAPING + NEWSAPI")
+    log.info("  AI STOCK INTELLIGENCE v4 — RELAXED THRESHOLDS")
     log.info("=" * 65)
 
-    # Load models
     engine = SentimentEngine()
     nlp    = load_nlp()
 
-    # Collect news from ALL sources
-    articles = collect_all_news()
-
+    articles = collect_news()
     if not articles:
-        log.error("❌ No articles from ANY source. Check internet connectivity.")
-        send_telegram(
-            "⚠ <b>System Error</b>\n"
-            "Could not fetch any news today.\n"
-            "Scraping + NewsAPI both returned 0 articles.\n"
-            "Please check the GitHub Actions log."
-        )
-        save_alert({
-            "type": "no_signal",
-            "date": now.strftime("%Y-%m-%d"),
-            "time": now.strftime("%H:%M"),
-            "market_mood": "Unknown",
-        })
+        msg = "⚠ <b>System Error</b>\nCould not fetch any news today. Check GitHub Actions log."
+        send_telegram(msg)
+        save_alert({"type":"no_signal","date":now.strftime("%Y-%m-%d"),
+                    "time":now.strftime("%H:%M"),"market_mood":"Unknown"})
         return
 
-    # Analyse each article
+    # ── Analyse ──────────────────────────────────────────────────────
     company_articles: dict[str, list[dict]] = defaultdict(list)
     all_sentiments:   list[dict]            = []
 
@@ -479,41 +474,48 @@ def main() -> None:
 
         log.info(
             f"  [{result['sentiment'].upper():8s}] {result['confidence']:.2f} | "
-            f"{art['title'][:70]}"
+            f"{art['title'][:72]}"
         )
 
     log.info(f"\n📊 Companies detected: {len(company_articles)}")
-
-    # Market mood
     mood = market_mood(all_sentiments)
     log.info(f"🌐 Market Mood: {mood}")
 
-    # Predict + signal
-    log.info("\n── PREDICTIONS ──")
+    # ── Predict + rank by confidence ────────────────────────────────
+    predictions = []
+    for company, records in company_articles.items():
+        pred = predict(records)
+        if pred["prediction"] in ("RISE", "FALL"):
+            top      = max(records, key=lambda r: r["confidence"])
+            predictions.append((company, pred, top))
+            log.info(
+                f"  ✦ {company:35s} → {pred['prediction']:5s} "
+                f"conf={round(pred['confidence']*100)}% | {pred['reasoning']}"
+            )
+        else:
+            log.info(
+                f"  · {company:35s} → NEUTRAL conf={round(pred['confidence']*100)}%"
+            )
+
+    # Sort by confidence, highest first
+    predictions.sort(key=lambda x: x[1]["confidence"], reverse=True)
+
+    # ── Send top N signals ───────────────────────────────────────────
     signals_sent = 0
     alerted      = set()
 
-    for company, records in company_articles.items():
-        if len(records) < MIN_ARTICLES_FOR_SIGNAL:
-            log.info(f"  {company:35s} → SKIP ({len(records)} article only)")
-            continue
-
-        pred = predict(records)
-        log.info(
-            f"  {company:35s} → {pred['prediction']:7s} "
-            f"conf={pred['confidence']:.2f} | {pred['reasoning']}"
-        )
-
+    for company, pred, top in predictions:
+        if signals_sent >= MAX_SIGNALS:
+            break
         if company in alerted:
             continue
 
-        top      = max(records, key=lambda r: r["confidence"])
         headline = top["title"]
         source   = top.get("source", "")
 
         if pred["prediction"] == "RISE":
             if mood == "Bearish":
-                log.info(f"    ↳ Suppressed (Bearish market)")
+                log.info(f"  ↳ {company} RISE suppressed (Bearish market)")
                 continue
             send_telegram(rise_msg(company, pred, headline, source, mood))
             save_alert({
@@ -529,8 +531,6 @@ def main() -> None:
                 "top_source":    source,
                 "market_mood":   mood,
             })
-            alerted.add(company)
-            signals_sent += 1
 
         elif pred["prediction"] == "FALL":
             send_telegram(fall_msg(company, pred, headline, source, mood))
@@ -547,17 +547,18 @@ def main() -> None:
                 "top_source":    source,
                 "market_mood":   mood,
             })
-            alerted.add(company)
-            signals_sent += 1
 
-    # No signals
+        alerted.add(company)
+        signals_sent += 1
+
+    # ── No signals ───────────────────────────────────────────────────
     if signals_sent == 0:
         send_telegram(
             f"🔕 <b>No strong signals today.</b>\n"
             f"Market Mood: <b>{mood}</b>\n"
             f"Articles analysed: {len(articles)}\n"
             f"Companies found: {len(company_articles)}\n"
-            f"No high-confidence RISE/FALL predictions."
+            f"All predictions below confidence threshold."
         )
         save_alert({
             "type":              "no_signal",
@@ -569,7 +570,7 @@ def main() -> None:
         })
 
     elapsed = round(time.time() - start, 2)
-    log.info(f"\n✅ Done in {elapsed}s · Signals: {signals_sent}")
+    log.info(f"\n✅ Done in {elapsed}s · Signals sent: {signals_sent}")
     log.info("=" * 65)
 
 

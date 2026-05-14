@@ -1,5 +1,44 @@
 [
   {
+    "type": "rise",
+    "date": "2026-05-14",
+    "time": "05:50",
+    "company": "Cipla",
+    "confidence": "95",
+    "article_count": "1",
+    "pos_ratio": "100",
+    "reasoning": "Strong positive signal \u00b7 confidence 95%",
+    "top_headline": "Cipla: Strong pipeline to help US business recovery",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
+    "type": "fall",
+    "date": "2026-05-14",
+    "time": "05:50",
+    "company": "JPMorgan",
+    "confidence": "97",
+    "article_count": "1",
+    "neg_ratio": "100",
+    "reasoning": "Strong negative signal \u00b7 confidence 97%",
+    "top_headline": "Kaynes Tech plunges over 17% as firm misses guidance in Q4; JPMorgan downgrades stock",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
+    "type": "fall",
+    "date": "2026-05-14",
+    "time": "05:50",
+    "company": "Kaynes Tech",
+    "confidence": "97",
+    "article_count": "1",
+    "neg_ratio": "100",
+    "reasoning": "Strong negative signal \u00b7 confidence 97%",
+    "top_headline": "Kaynes Tech plunges over 17% as firm misses guidance in Q4; JPMorgan downgrades stock",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
     "type": "no_signal",
     "date": "2026-05-13",
     "time": "13:49",

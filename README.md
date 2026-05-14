@@ -11,8 +11,7 @@ It is not meant for direct trading but shows how AI and automation can turn raw 
 - Focused on the Indian share/stock market  
 
 ### Example Alert
-BUY Signal Detected for Fortis Healthcare!  
-Reason: Stock hit 52-week highs and rallied up to 30% in a month.  
+https://sumukh964.github.io/AI_stock_notifier/  
 
 ## 📸 Screenshots / Demo
 <img width="1831" height="1079" alt="image" src="https://github.com/user-attachments/assets/328a77ff-2827-455c-9019-7327bfd31b2d" />

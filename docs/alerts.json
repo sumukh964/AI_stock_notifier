@@ -1,6 +1,58 @@
 [
   {
     "type": "rise",
+    "date": "2026-05-24",
+    "time": "06:03",
+    "company": "Bank Nifty",
+    "confidence": "93",
+    "article_count": "1",
+    "pos_ratio": "100",
+    "reasoning": "Strong positive signal \u00b7 confidence 93%",
+    "top_headline": "Technical View: Momentum indicators point to easing bearishness; 20-DEMA key for Nifty to target 24,000 next week, Bank Nifty climbs back above 54,000",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
+    "type": "rise",
+    "date": "2026-05-24",
+    "time": "06:03",
+    "company": "Vodafone Idea",
+    "confidence": "94",
+    "article_count": "1",
+    "pos_ratio": "100",
+    "reasoning": "Strong positive signal \u00b7 confidence 94%",
+    "top_headline": "Vodafone Idea shares jump 6.5% in 4-day rally, stock up nearly 45% in one month",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
+    "type": "rise",
+    "date": "2026-05-24",
+    "time": "06:03",
+    "company": "Rs 50",
+    "confidence": "95",
+    "article_count": "1",
+    "pos_ratio": "100",
+    "reasoning": "Strong positive signal \u00b7 confidence 95%",
+    "top_headline": "Dr Agarwals Health Care Q4 profit grows 17.4% to Rs 50 crore",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
+    "type": "rise",
+    "date": "2026-05-24",
+    "time": "06:03",
+    "company": "Dr Agarwals Health Care Q4",
+    "confidence": "95",
+    "article_count": "1",
+    "pos_ratio": "100",
+    "reasoning": "Strong positive signal \u00b7 confidence 95%",
+    "top_headline": "Dr Agarwals Health Care Q4 profit grows 17.4% to Rs 50 crore",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
+    "type": "rise",
     "date": "2026-05-23",
     "time": "05:41",
     "company": "Info Edge",

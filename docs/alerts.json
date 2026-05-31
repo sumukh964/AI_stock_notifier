@@ -1,5 +1,57 @@
 [
   {
+    "type": "rise",
+    "date": "2026-05-31",
+    "time": "06:20",
+    "company": "Daily Voice",
+    "confidence": "93",
+    "article_count": "2",
+    "pos_ratio": "100",
+    "reasoning": "2/2 positive \u00b7 avg score +0.89",
+    "top_headline": "Daily Voice | Narnolia's Shailendra Kumar sees 2HFY27 significantly stronger than 1HFY27 for corporate earnings",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
+    "type": "rise",
+    "date": "2026-05-31",
+    "time": "06:20",
+    "company": "Reliance",
+    "confidence": "95",
+    "article_count": "1",
+    "pos_ratio": "100",
+    "reasoning": "Strong positive signal \u00b7 confidence 95%",
+    "top_headline": "Moody's upgrades Reliance to Baa1 on strong balance sheet, diversified businesses",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
+    "type": "rise",
+    "date": "2026-05-31",
+    "time": "06:20",
+    "company": "Moody's",
+    "confidence": "95",
+    "article_count": "1",
+    "pos_ratio": "100",
+    "reasoning": "Strong positive signal \u00b7 confidence 95%",
+    "top_headline": "Moody's upgrades Reliance to Baa1 on strong balance sheet, diversified businesses",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
+    "type": "rise",
+    "date": "2026-05-31",
+    "time": "06:20",
+    "company": "Narnolia",
+    "confidence": "95",
+    "article_count": "1",
+    "pos_ratio": "100",
+    "reasoning": "Strong positive signal \u00b7 confidence 95%",
+    "top_headline": "Daily Voice | Narnolia's Shailendra Kumar sees 2HFY27 significantly stronger than 1HFY27 for corporate earnings",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
     "type": "no_signal",
     "date": "2026-05-30",
     "time": "05:50",

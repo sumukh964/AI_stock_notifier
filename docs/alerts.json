@@ -1,6 +1,45 @@
 [
   {
     "type": "rise",
+    "date": "2026-06-14",
+    "time": "06:42",
+    "company": "Rs 1,220-crore",
+    "confidence": "88",
+    "article_count": "1",
+    "pos_ratio": "100",
+    "reasoning": "Strong positive signal \u00b7 confidence 88%",
+    "top_headline": "Casagrand Premier Builder moves closer to Rs 1,220-crore IPO as SEBI approves draft documents",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
+    "type": "rise",
+    "date": "2026-06-14",
+    "time": "06:42",
+    "company": "Casagrand",
+    "confidence": "88",
+    "article_count": "1",
+    "pos_ratio": "100",
+    "reasoning": "Strong positive signal \u00b7 confidence 88%",
+    "top_headline": "Casagrand Premier Builder moves closer to Rs 1,220-crore IPO as SEBI approves draft documents",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
+    "type": "rise",
+    "date": "2026-06-14",
+    "time": "06:42",
+    "company": "Bank Nifty",
+    "confidence": "94",
+    "article_count": "1",
+    "pos_ratio": "100",
+    "reasoning": "Strong positive signal \u00b7 confidence 94%",
+    "top_headline": "Technical View: Bulls may target 24,000 next week if Nifty 50 holds above the 20-DEMA; Bank Nifty eyes April high amid strong momentum indicators",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
+    "type": "rise",
     "date": "2026-06-13",
     "time": "06:18",
     "company": "Axis Bank",

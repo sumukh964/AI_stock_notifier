@@ -1,5 +1,31 @@
 [
   {
+    "type": "rise",
+    "date": "2026-09-12",
+    "time": "06:56",
+    "company": "Alpha \u2019s Mukesh Jindal",
+    "confidence": "88",
+    "article_count": "1",
+    "pos_ratio": "100",
+    "reasoning": "Strong positive signal \u00b7 confidence 88%",
+    "top_headline": "Daily Voice: Market correction offers opportunity in four quality sectors, says Alpha Capital\u2019s Mukesh Jindal",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
+    "type": "rise",
+    "date": "2026-09-12",
+    "time": "06:56",
+    "company": "ESDS Software",
+    "confidence": "89",
+    "article_count": "1",
+    "pos_ratio": "100",
+    "reasoning": "Strong positive signal \u00b7 confidence 89%",
+    "top_headline": "ESDS Software shares extend post-listing rally, hit 10% upper circuit; Maithan Alloys acquires 0.65% stake",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
     "type": "fall",
     "date": "2026-09-11",
     "time": "07:03",

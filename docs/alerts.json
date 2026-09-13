@@ -1,5 +1,44 @@
 [
   {
+    "type": "fall",
+    "date": "2026-09-13",
+    "time": "07:14",
+    "company": "Oracle",
+    "confidence": "88",
+    "article_count": "1",
+    "neg_ratio": "100",
+    "reasoning": "Strong negative signal \u00b7 confidence 88%",
+    "top_headline": "Oracle\u2019s Larry Ellison cancels plan to sell up to 50 million shares",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
+    "type": "rise",
+    "date": "2026-09-13",
+    "time": "07:14",
+    "company": "Alpha \u2019s Mukesh Jindal",
+    "confidence": "88",
+    "article_count": "1",
+    "pos_ratio": "100",
+    "reasoning": "Strong positive signal \u00b7 confidence 88%",
+    "top_headline": "Daily Voice: Market correction offers opportunity in four quality sectors, says Alpha Capital\u2019s Mukesh Jindal",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
+    "type": "rise",
+    "date": "2026-09-13",
+    "time": "07:14",
+    "company": "ESDS Software",
+    "confidence": "89",
+    "article_count": "1",
+    "pos_ratio": "100",
+    "reasoning": "Strong positive signal \u00b7 confidence 89%",
+    "top_headline": "ESDS Software shares extend post-listing rally, hit 10% upper circuit; Maithan Alloys acquires 0.65% stake",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
     "type": "rise",
     "date": "2026-09-12",
     "time": "06:56",

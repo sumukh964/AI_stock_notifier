@@ -1,5 +1,18 @@
 [
   {
+    "type": "rise",
+    "date": "2026-11-08",
+    "time": "08:40",
+    "company": "Bank Nifty",
+    "confidence": "90",
+    "article_count": "1",
+    "pos_ratio": "100",
+    "reasoning": "Strong positive signal \u00b7 confidence 90%",
+    "top_headline": "Muhurat Trading Plan: Can Nifty 50 extend its rally for 8th straight session, Bank Nifty hold above 59,000?",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
     "type": "no_signal",
     "date": "2026-11-07",
     "time": "08:25",

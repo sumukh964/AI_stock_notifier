@@ -1,5 +1,44 @@
 [
   {
+    "type": "rise",
+    "date": "2026-11-15",
+    "time": "08:53",
+    "company": "Rs 76,000",
+    "confidence": "89",
+    "article_count": "1",
+    "pos_ratio": "100",
+    "reasoning": "Strong positive signal \u00b7 confidence 89%",
+    "top_headline": "FPIs pump over Rs 76,000 crore into equities in November so far, monthly record in sight",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
+    "type": "fall",
+    "date": "2026-11-15",
+    "time": "08:53",
+    "company": "Outlook, Teams",
+    "confidence": "97",
+    "article_count": "1",
+    "neg_ratio": "100",
+    "reasoning": "Strong negative signal \u00b7 confidence 97%",
+    "top_headline": "Microsoft shares fall 2.5% as massive outage disrupts Outlook, Teams, AI services worldwide",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
+    "type": "fall",
+    "date": "2026-11-15",
+    "time": "08:53",
+    "company": "Microsoft",
+    "confidence": "97",
+    "article_count": "1",
+    "neg_ratio": "100",
+    "reasoning": "Strong negative signal \u00b7 confidence 97%",
+    "top_headline": "Microsoft shares fall 2.5% as massive outage disrupts Outlook, Teams, AI services worldwide",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
     "type": "no_signal",
     "date": "2026-11-14",
     "time": "08:40",

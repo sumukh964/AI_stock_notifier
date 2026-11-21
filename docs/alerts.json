@@ -1,5 +1,44 @@
 [
   {
+    "type": "rise",
+    "date": "2026-11-21",
+    "time": "09:16",
+    "company": "Bank Nifty",
+    "confidence": "84",
+    "article_count": "3",
+    "pos_ratio": "100",
+    "reasoning": "3/3 positive \u00b7 avg score +0.81",
+    "top_headline": "Live: Bank Nifty tops 64,000 for the 1st time; Nifty, Sensex surges 2% this week | Closing Bell",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
+    "type": "rise",
+    "date": "2026-11-21",
+    "time": "09:16",
+    "company": "Closing Bell",
+    "confidence": "93",
+    "article_count": "1",
+    "pos_ratio": "100",
+    "reasoning": "Strong positive signal \u00b7 confidence 93%",
+    "top_headline": "Live: Bank Nifty tops 64,000 for the 1st time; Nifty, Sensex surges 2% this week | Closing Bell",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
+    "type": "fall",
+    "date": "2026-11-21",
+    "time": "09:16",
+    "company": "AMD",
+    "confidence": "96",
+    "article_count": "1",
+    "neg_ratio": "100",
+    "reasoning": "Strong negative signal \u00b7 confidence 96%",
+    "top_headline": "After Nvidia, AMD now alleged to have China supply links; short seller flags ties, stock plunges 7.7%",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
     "type": "fall",
     "date": "2026-11-20",
     "time": "09:45",

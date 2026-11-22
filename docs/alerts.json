@@ -1,6 +1,58 @@
 [
   {
     "type": "rise",
+    "date": "2026-11-22",
+    "time": "09:26",
+    "company": "Bank Nifty",
+    "confidence": "80",
+    "article_count": "2",
+    "pos_ratio": "100",
+    "reasoning": "2/2 positive \u00b7 avg score +0.77",
+    "top_headline": "Technical View: Bulls charge towards 26,000 on Nifty 50 after decisive breakout; Bank Nifty eyes 65,000 next week as record rally continues",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
+    "type": "fall",
+    "date": "2026-11-22",
+    "time": "09:26",
+    "company": "Rs 170",
+    "confidence": "88",
+    "article_count": "1",
+    "neg_ratio": "100",
+    "reasoning": "Strong negative signal \u00b7 confidence 88%",
+    "top_headline": "Medicap Healthcare cuts IPO size by 29% to Rs 170 crore, drops pre-IPO placement",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
+    "type": "fall",
+    "date": "2026-11-22",
+    "time": "09:26",
+    "company": "Medicap Healthcare",
+    "confidence": "88",
+    "article_count": "1",
+    "neg_ratio": "100",
+    "reasoning": "Strong negative signal \u00b7 confidence 88%",
+    "top_headline": "Medicap Healthcare cuts IPO size by 29% to Rs 170 crore, drops pre-IPO placement",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
+    "type": "fall",
+    "date": "2026-11-22",
+    "time": "09:26",
+    "company": "IPO",
+    "confidence": "89",
+    "article_count": "4",
+    "neg_ratio": "100",
+    "reasoning": "4/4 negative \u00b7 avg score -0.85",
+    "top_headline": "AI trade under pressure: Anthropic IPO fails to lift Wall Street as Nasdaq 100 suffers worst week since 2020",
+    "top_source": "Moneycontrol",
+    "market_mood": "Neutral"
+  },
+  {
+    "type": "rise",
     "date": "2026-11-21",
     "time": "09:16",
     "company": "Bank Nifty",
